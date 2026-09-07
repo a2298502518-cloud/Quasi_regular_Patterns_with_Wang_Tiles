@@ -9,11 +9,17 @@
 namespace qrp::color {
 namespace {
 
-[[nodiscard]] double srgbToLinear(const std::uint8_t channel) noexcept {
-    const double value = static_cast<double>(channel) / 255.0;
+[[nodiscard]] double decodeSrgb(const double value) noexcept {
     return value <= 0.04045
         ? value / 12.92
         : std::pow((value + 0.055) / 1.055, 2.4);
+}
+
+[[nodiscard]] double encodeSrgb(const double value) noexcept {
+    const double bounded = std::clamp(value, 0.0, 1.0);
+    return bounded <= 0.0031308
+        ? 12.92 * bounded
+        : 1.055 * std::pow(bounded, 1.0 / 2.4) - 0.055;
 }
 
 [[nodiscard]] Color3 linearRgbFromSrgb8(
@@ -21,9 +27,9 @@ namespace {
     const std::uint8_t green,
     const std::uint8_t blue) noexcept {
     return {
-        srgbToLinear(red),
-        srgbToLinear(green),
-        srgbToLinear(blue),
+        decodeSrgb(static_cast<double>(red) / 255.0),
+        decodeSrgb(static_cast<double>(green) / 255.0),
+        decodeSrgb(static_cast<double>(blue) / 255.0),
     };
 }
 
@@ -160,6 +166,22 @@ double maximumChannelDifference(const Color3 first, const Color3 second) noexcep
         std::abs(first.green - second.green),
         std::abs(first.blue - second.blue),
     });
+}
+
+Color3 linearFromSrgb(const Color3 color) noexcept {
+    return {
+        decodeSrgb(std::clamp(color.red, 0.0, 1.0)),
+        decodeSrgb(std::clamp(color.green, 0.0, 1.0)),
+        decodeSrgb(std::clamp(color.blue, 0.0, 1.0)),
+    };
+}
+
+Color3 srgbFromLinear(const Color3 color) noexcept {
+    return {
+        encodeSrgb(color.red),
+        encodeSrgb(color.green),
+        encodeSrgb(color.blue),
+    };
 }
 
 } // namespace qrp::color

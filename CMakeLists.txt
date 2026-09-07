@@ -25,6 +25,13 @@ if(QRP_BUILD_REALTIME)
     )
     FetchContent_MakeAvailable(glfw)
 
+    FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG 01380c579715e62fb9a8d6ec0502c4ea83bfde6e # 1.92.9
+    )
+    FetchContent_MakeAvailable(imgui)
+
     add_library(qrp_glad STATIC
         third_party/glad/src/gl.c
     )
@@ -32,6 +39,22 @@ if(QRP_BUILD_REALTIME)
         PUBLIC
             "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glad/include"
     )
+
+    add_library(qrp_imgui STATIC
+        "${imgui_SOURCE_DIR}/imgui.cpp"
+        "${imgui_SOURCE_DIR}/imgui_draw.cpp"
+        "${imgui_SOURCE_DIR}/imgui_tables.cpp"
+        "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
+        "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
+        "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+    )
+    target_include_directories(qrp_imgui
+        PUBLIC
+            "${imgui_SOURCE_DIR}"
+            "${imgui_SOURCE_DIR}/backends"
+    )
+    target_link_libraries(qrp_imgui PUBLIC glfw)
+    target_compile_features(qrp_imgui PUBLIC cxx_std_20)
 endif()
 
 add_library(qrp_math STATIC
@@ -81,6 +104,17 @@ add_library(qrp_presets STATIC
 target_link_libraries(qrp_presets PUBLIC qrp_color qrp_generators)
 target_compile_features(qrp_presets PUBLIC cxx_std_20)
 
+add_library(qrp_project STATIC
+    src/project/PatternProject.cpp
+)
+
+target_link_libraries(qrp_project
+    PUBLIC
+        qrp_model
+        qrp_presets
+)
+target_compile_features(qrp_project PUBLIC cxx_std_20)
+
 add_library(qrp_render STATIC
     src/export/PpmWriter.cpp
     src/render/CpuReferenceRenderer.cpp
@@ -118,6 +152,17 @@ if(QRP_BUILD_REALTIME)
     )
     target_compile_features(qrp_opengl PUBLIC cxx_std_20)
 
+    add_library(qrp_ui STATIC
+        src/ui/PatternEditor.cpp
+    )
+    target_link_libraries(qrp_ui
+        PUBLIC
+            qrp_imgui
+            qrp_opengl
+            qrp_project
+    )
+    target_compile_features(qrp_ui PUBLIC cxx_std_20)
+
     add_executable(qrp_realtime
         apps/realtime_main.cpp
     )
@@ -127,8 +172,10 @@ if(QRP_BUILD_REALTIME)
             glfw
             qrp_glad
             qrp_opengl
+            qrp_project
             qrp_presets
             qrp_render
+            qrp_ui
     )
     target_compile_features(qrp_realtime PRIVATE cxx_std_20)
     target_compile_definitions(
@@ -154,6 +201,7 @@ foreach(target
     qrp_generators
     qrp_color
     qrp_presets
+    qrp_project
     qrp_render
     qrp_cpu_reference
 )
@@ -165,7 +213,7 @@ foreach(target
 endforeach()
 
 if(QRP_BUILD_REALTIME)
-    foreach(target qrp_opengl qrp_realtime)
+    foreach(target qrp_imgui qrp_opengl qrp_ui qrp_realtime)
         if(MSVC)
             target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
         else()

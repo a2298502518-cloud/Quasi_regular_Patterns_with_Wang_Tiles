@@ -5,8 +5,10 @@
 #include "model/EdgePalette.hpp"
 #include "model/WangGrid.hpp"
 #include "presets/PatternPreset.hpp"
+#include "project/PatternProject.hpp"
 #include "render/CpuReferenceRenderer.hpp"
 #include "render/opengl/GpuPatternRenderer.hpp"
+#include "ui/PatternEditor.hpp"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -18,6 +20,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -35,6 +38,7 @@ using qrp::render::opengl::DebugView;
 
 struct CommandLineOptions {
     bool capture = false;
+    bool captureUi = false;
     bool validate = false;
     std::filesystem::path capturePath = "output/gpu/gpu_capture.ppm";
     std::size_t presetIndex = 2;
@@ -49,7 +53,7 @@ struct CommandLineOptions {
 struct AppState {
     Camera2D camera;
     DebugView debugView = DebugView::Pattern;
-    std::size_t requestedPreset = 2;
+    std::size_t requestedPreset = std::numeric_limits<std::size_t>::max();
     bool resetRequested = false;
     bool dragging = false;
     double previousCursorX = 0.0;
@@ -89,6 +93,13 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
                 throw std::invalid_argument("--capture requires an output path.");
             }
             options.capture = true;
+            options.capturePath = argv[++index];
+        } else if (argument == "--capture-ui") {
+            if (index + 1 >= argc) {
+                throw std::invalid_argument("--capture-ui requires an output path.");
+            }
+            options.capture = true;
+            options.captureUi = true;
             options.capturePath = argv[++index];
         } else if (argument == "--validate") {
             options.capture = true;
@@ -158,16 +169,16 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
 }
 
 void resetCamera(
-    const qrp::presets::PatternPreset& preset,
+    const qrp::project::PatternConfiguration& configuration,
     const int framebufferWidth,
     const int framebufferHeight,
     Camera2D& camera) {
-    camera.pixelsPerTile = static_cast<double>(preset.pixelsPerTile);
+    camera.pixelsPerTile = static_cast<double>(configuration.pixelsPerTile);
     camera.originX = 0.5 * (
-        static_cast<double>(preset.gridWidth)
+        static_cast<double>(configuration.gridWidth)
         - static_cast<double>(framebufferWidth) / camera.pixelsPerTile);
     camera.originY = 0.5 * (
-        static_cast<double>(preset.gridHeight)
+        static_cast<double>(configuration.gridHeight)
         - static_cast<double>(framebufferHeight) / camera.pixelsPerTile);
 }
 
@@ -195,6 +206,8 @@ void keyCallback(GLFWwindow* window, const int key, int, const int action, int) 
     auto& state = *static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if (key == GLFW_KEY_ESCAPE) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    } else if (qrp::ui::wantsKeyboardInput()) {
+        return;
     } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5) {
         state.requestedPreset = static_cast<std::size_t>(key - GLFW_KEY_1);
     } else if (key == GLFW_KEY_D) {
@@ -210,6 +223,10 @@ void mouseButtonCallback(GLFWwindow* window, const int button, const int action,
         return;
     }
     auto& state = *static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (qrp::ui::wantsMouseInput()) {
+        state.dragging = false;
+        return;
+    }
     state.dragging = action == GLFW_PRESS;
     if (state.dragging) {
         glfwGetCursorPos(window, &state.previousCursorX, &state.previousCursorY);
@@ -218,6 +235,10 @@ void mouseButtonCallback(GLFWwindow* window, const int button, const int action,
 
 void cursorCallback(GLFWwindow* window, const double x, const double y) {
     auto& state = *static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (qrp::ui::wantsMouseInput()) {
+        state.dragging = false;
+        return;
+    }
     if (!state.dragging) {
         return;
     }
@@ -238,6 +259,9 @@ void cursorCallback(GLFWwindow* window, const double x, const double y) {
 }
 
 void scrollCallback(GLFWwindow* window, double, const double yOffset) {
+    if (qrp::ui::wantsMouseInput()) {
+        return;
+    }
     auto& state = *static_cast<AppState*>(glfwGetWindowUserPointer(window));
     int windowWidth = 1;
     int windowHeight = 1;
@@ -437,7 +461,8 @@ int main(int argc, char** argv) {
         if (options.validate
             && (options.debugView != DebugView::Pattern
                 || options.captureWidth != 0
-                || options.cameraOverride)) {
+                || options.cameraOverride
+                || options.captureUi)) {
             throw std::invalid_argument(
                 "GPU validation requires the default size, camera, and pattern view.");
         }
@@ -484,10 +509,9 @@ int main(int argc, char** argv) {
         glDebugMessageCallback(debugCallback, nullptr);
 
         qrp::render::opengl::GpuPatternRenderer renderer(QRP_SHADER_DIR);
-        const auto edgePalette = qrp::model::EdgePalette::createDefault();
-        std::size_t activePreset = options.presetIndex;
+        qrp::project::PatternProject project(
+            qrp::project::configurationFromPreset(initialPreset));
         AppState state;
-        state.requestedPreset = activePreset;
         state.debugView = options.debugView;
         glfwSetWindowUserPointer(window.get(), &state);
         glfwSetKeyCallback(window.get(), keyCallback);
@@ -495,24 +519,19 @@ int main(int argc, char** argv) {
         glfwSetCursorPosCallback(window.get(), cursorCallback);
         glfwSetScrollCallback(window.get(), scrollCallback);
 
-        auto uploadPreset = [&](const std::size_t index) {
-            const auto& preset = presets[index];
-            const qrp::model::WangGrid grid(
-                preset.gridWidth,
-                preset.gridHeight,
-                static_cast<std::uint32_t>(edgePalette.colors().size()),
-                preset.gridSeed);
-            const qrp::generators::HybridTorusGenerator generator(
-                qrp::generators::TorusFourier::createQuasiRegular(),
-                qrp::generators::PeriodicGradientNoise{},
-                preset.generator);
-            renderer.uploadScene(grid, edgePalette, generator, preset.palette);
+        auto uploadCommittedScene = [&]() {
+            const auto& scene = project.scene();
+            renderer.uploadScene(
+                scene.grid,
+                scene.edgePalette,
+                scene.generator,
+                scene.colorPalette);
         };
-        uploadPreset(activePreset);
+        uploadCommittedScene();
         int framebufferWidth = initialWidth;
         int framebufferHeight = initialHeight;
         glfwGetFramebufferSize(window.get(), &framebufferWidth, &framebufferHeight);
-        resetCamera(presets[activePreset], framebufferWidth, framebufferHeight, state.camera);
+        resetCamera(project.committed(), framebufferWidth, framebufferHeight, state.camera);
         if (options.benchmarkFrames > 0) {
             const auto start = std::chrono::steady_clock::now();
             for (int frame = 0; frame < options.benchmarkFrames; ++frame) {
@@ -538,7 +557,23 @@ int main(int argc, char** argv) {
         }
 
         if (options.capture) {
-            renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
+            if (options.captureUi) {
+                glfwPollEvents();
+                qrp::ui::EditorRuntime editorRuntime(window.get());
+                const qrp::ui::PatternEditor editor;
+                editorRuntime.beginFrame();
+                static_cast<void>(editor.draw(
+                    project.draft(),
+                    project.isDirty(),
+                    project.revision(),
+                    project.lastApplyResult(),
+                    state.debugView,
+                    presets));
+                renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
+                editorRuntime.render();
+            } else {
+                renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
+            }
             glFinish();
             const auto gpuImage = readFramebuffer(framebufferWidth, framebufferHeight);
             if (!options.capturePath.parent_path().empty()) {
@@ -547,27 +582,20 @@ int main(int argc, char** argv) {
             qrp::exporting::writePpm(gpuImage, options.capturePath);
 
             if (!options.validate) {
-                std::cout << "Captured " << debugViewName(state.debugView)
+                std::cout << "Captured "
+                          << (options.captureUi ? "editor" : debugViewName(state.debugView))
                           << " view to " << options.capturePath.string() << '\n';
                 return 0;
             }
 
-            const auto& preset = presets[activePreset];
-            const qrp::model::WangGrid grid(
-                preset.gridWidth,
-                preset.gridHeight,
-                static_cast<std::uint32_t>(edgePalette.colors().size()),
-                preset.gridSeed);
-            const qrp::generators::HybridTorusGenerator generator(
-                qrp::generators::TorusFourier::createQuasiRegular(),
-                qrp::generators::PeriodicGradientNoise{},
-                preset.generator);
+            const auto& configuration = project.committed();
+            const auto& scene = project.scene();
             const auto cpu = qrp::render::CpuReferenceRenderer::render(
-                grid,
-                edgePalette,
-                generator,
-                preset.palette,
-                qrp::render::CpuRenderSettings{preset.pixelsPerTile, {}});
+                scene.grid,
+                scene.edgePalette,
+                scene.generator,
+                scene.colorPalette,
+                qrp::render::CpuRenderSettings{configuration.pixelsPerTile, {}});
             const auto comparison = compareImages(gpuImage, cpu.image);
             const auto gpuValues = renderer.renderValidationBuffers(
                 framebufferWidth,
@@ -575,11 +603,11 @@ int main(int argc, char** argv) {
                 state.camera);
             const auto intermediate = compareIntermediateValues(
                 gpuValues,
-                grid,
-                edgePalette,
-                generator,
-                preset.palette,
-                preset.pixelsPerTile);
+                scene.grid,
+                scene.edgePalette,
+                scene.generator,
+                scene.colorPalette,
+                configuration.pixelsPerTile);
             std::cout << "GPU/CPU: max_8bit_difference="
                       << static_cast<unsigned int>(comparison.maximumChannelDifference)
                       << ", mean_8bit_difference=" << std::fixed << std::setprecision(4)
@@ -612,6 +640,8 @@ int main(int argc, char** argv) {
         }
 
         glfwSwapInterval(1);
+        qrp::ui::EditorRuntime editorRuntime(window.get());
+        const qrp::ui::PatternEditor editor;
         auto titleStart = std::chrono::steady_clock::now();
         std::uint64_t titleFrames = 0;
         while (glfwWindowShouldClose(window.get()) == GLFW_FALSE) {
@@ -621,25 +651,60 @@ int main(int argc, char** argv) {
                 glfwWaitEventsTimeout(0.05);
                 continue;
             }
-            if (state.requestedPreset != activePreset) {
-                activePreset = state.requestedPreset;
-                uploadPreset(activePreset);
+            if (state.requestedPreset < presets.size()) {
+                const std::size_t requestedPreset = state.requestedPreset;
+                state.requestedPreset = std::numeric_limits<std::size_t>::max();
+                project.loadPresetIntoDraft(presets[requestedPreset]);
+                const auto result = project.applyDraft();
+                if (!result.applied) {
+                    throw std::runtime_error("Baseline preset failed validation: " + result.message);
+                }
+                uploadCommittedScene();
                 resetCamera(
-                    presets[activePreset],
+                    project.committed(),
                     framebufferWidth,
                     framebufferHeight,
                     state.camera);
             }
             if (state.resetRequested) {
                 resetCamera(
-                    presets[activePreset],
+                    project.committed(),
                     framebufferWidth,
                     framebufferHeight,
                     state.camera);
                 state.resetRequested = false;
             }
 
+            editorRuntime.beginFrame();
+            const auto actions = editor.draw(
+                project.draft(),
+                project.isDirty(),
+                project.revision(),
+                project.lastApplyResult(),
+                state.debugView,
+                presets);
+            if (actions.loadPreset) {
+                project.loadPresetIntoDraft(presets.at(*actions.loadPreset));
+            }
+            if (actions.discardDraft) {
+                project.resetDraft();
+            }
+            if (actions.applyDraft) {
+                const auto result = project.applyDraft();
+                if (result.applied) {
+                    uploadCommittedScene();
+                }
+            }
+            if (actions.resetCamera) {
+                resetCamera(
+                    project.committed(),
+                    framebufferWidth,
+                    framebufferHeight,
+                    state.camera);
+            }
+
             renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
+            editorRuntime.render();
             glfwSwapBuffers(window.get());
             ++titleFrames;
             const auto now = std::chrono::steady_clock::now();
@@ -647,9 +712,9 @@ int main(int argc, char** argv) {
             if (elapsed >= 0.5) {
                 const double fps = static_cast<double>(titleFrames) / elapsed;
                 const std::string title = "Quasi-regular Wang Patterns | "
-                    + presets[activePreset].name + " | " + debugViewName(state.debugView)
+                    + project.committed().name + " | " + debugViewName(state.debugView)
                     + " | " + std::to_string(static_cast<int>(std::lround(fps)))
-                    + " FPS | 1-5 preset, D debug, R reset";
+                    + " FPS | draft/Apply editor";
                 glfwSetWindowTitle(window.get(), title.c_str());
                 titleStart = now;
                 titleFrames = 0;

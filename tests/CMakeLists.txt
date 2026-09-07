@@ -17,7 +17,7 @@ add_executable(qrp_pipeline_tests
     pipeline_tests.cpp
 )
 
-target_link_libraries(qrp_pipeline_tests PRIVATE qrp_render)
+target_link_libraries(qrp_pipeline_tests PRIVATE qrp_project qrp_render)
 target_compile_features(qrp_pipeline_tests PRIVATE cxx_std_20)
 
 if(MSVC)

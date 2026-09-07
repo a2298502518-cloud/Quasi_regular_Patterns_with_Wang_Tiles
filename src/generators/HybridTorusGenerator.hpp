@@ -17,6 +17,8 @@ struct HybridGeneratorSettings {
     double worldDomainWarpAmplitude = 0.08;
     double worldFrequencyX = 0.137;
     double worldFrequencyY = 0.091;
+
+    [[nodiscard]] bool operator==(const HybridGeneratorSettings&) const noexcept = default;
 };
 
 struct TileVariationDescriptor {

@@ -281,7 +281,8 @@ void main() {
     vec2 world = u_worldOrigin + gl_FragCoord.xy / u_pixelsPerTile;
     if (any(lessThan(world, vec2(0.0)))
         || any(greaterThanEqual(world, vec2(u_gridSize)))) {
-        outColor = vec4(0.008, 0.014, 0.024, 1.0);
+        // 画布外保留可辨认的深色工作区，避免宽屏窗口出现纯黑断层。
+        outColor = vec4(0.025, 0.036, 0.055, 1.0);
         outDiagnostics = vec4(-1.0);
         outLinearColor = vec4(-1.0);
         return;

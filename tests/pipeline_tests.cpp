@@ -4,6 +4,8 @@
 #include "generators/TorusFourier.hpp"
 #include "model/EdgePalette.hpp"
 #include "model/WangGrid.hpp"
+#include "presets/PatternPreset.hpp"
+#include "project/PatternProject.hpp"
 #include "render/CpuReferenceRenderer.hpp"
 
 #include <algorithm>
@@ -201,6 +203,35 @@ void testCpuReferenceRender() {
         "seam heatmap must identify internal grid edges");
 }
 
+void testProjectDraftCommitTransaction() {
+    const auto presets = qrp::presets::createBaselinePresets();
+    qrp::project::PatternProject project(
+        qrp::project::configurationFromPreset(presets.at(2)));
+    const auto firstRevision = project.revision();
+    const auto firstSeed = project.scene().grid.seed();
+
+    project.draft().gridSeed = firstSeed + 1;
+    require(project.isDirty(), "editing draft must mark the project dirty");
+    require(project.revision() == firstRevision, "editing draft must not increment revision");
+    require(project.scene().grid.seed() == firstSeed, "editing draft must not rebuild scene");
+
+    const auto success = project.applyDraft();
+    require(success.applied, "valid draft must commit");
+    require(project.revision() == firstRevision + 1, "successful Apply must increment revision");
+    require(project.scene().grid.seed() == firstSeed + 1, "successful Apply must rebuild scene");
+
+    const auto committed = project.committed();
+    project.draft().edgeColors.front().epsilon = 4.0;
+    const auto failed = project.applyDraft();
+    require(!failed.applied, "unsafe edge draft must be rejected");
+    require(project.revision() == firstRevision + 1, "failed Apply must preserve revision");
+    require(project.committed() == committed, "failed Apply must preserve committed parameters");
+    require(project.scene().grid.seed() == firstSeed + 1, "failed Apply must preserve scene");
+
+    project.resetDraft();
+    require(!project.isDirty(), "Reset Draft must restore committed parameters");
+}
+
 } // namespace
 
 int main() {
@@ -210,6 +241,7 @@ int main() {
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"measured seams", testMeasuredSeams},
         {"CPU reference render", testCpuReferenceRender},
+        {"project draft/commit transaction", testProjectDraftCommitTransaction},
     };
 
     int failures = 0;

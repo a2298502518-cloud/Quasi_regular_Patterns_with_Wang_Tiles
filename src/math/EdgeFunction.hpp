@@ -7,6 +7,8 @@ namespace qrp::math {
 struct EdgeParameters {
     double epsilon = 0.0;
     double delta = 0.0;
+
+    [[nodiscard]] bool operator==(const EdgeParameters&) const noexcept = default;
 };
 
 struct ScalarInverseOptions {
