@@ -87,6 +87,15 @@ lambda_v > 0
 lambda_h lambda_v - Delta_SN Delta_EW >= jacobian_margin
 ```
 
+当前参数族对边差使用解析上界：
+
+```text
+Delta_SN <= |epsilon_N - epsilon_S| + |delta_N - delta_S|
+Delta_EW <= |epsilon_E - epsilon_W| + |delta_E - delta_W|
+```
+
+该上界可能比真实最大值保守，但不会因为离散采样遗漏峰值。
+
 其中 `jacobian_margin` 必须为正，并在数值实现阶段通过误差分析确定默认值。满足该
 条件时，Jacobian 的两个对角项为正且行列式为正；结合凸参数域上的全局单射条件，
 可排除局部折叠。所有实际调色板组合还要经过稠密采样压力测试，但采样测试不能替代

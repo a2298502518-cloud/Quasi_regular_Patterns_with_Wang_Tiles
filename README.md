@@ -6,12 +6,13 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 
 ## 当前状态
 
-项目处于设计基线阶段，尚未开始算法与渲染代码实现。当前仓库包含：
+CPU 数学核心阶段已经完成，下一阶段将建立 CPU 基准图和接缝证明。当前仓库包含：
 
 - 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
 - [实现计划](./docs/implementation-plan.md)
 - [数学与坐标规范](./docs/math-spec.md)
 - [验证方案](./docs/validation.md)
+- 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
 周期条件的论证，不直接作为代码契约。
@@ -29,4 +30,15 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 实时显示 10 x 10 Wang 铺砌，支持周期噪声和 torus-safe QRP 两类生成器，包含
 接缝误差视图以及至少三套经过视觉打磨的预设。
 
-构建和运行说明将在首个可执行版本建立后补充。
+## 构建与测试
+
+Windows + Visual Studio 2022：
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
+
+当前构建只产生 CPU 数学库、边调色板模型和参考测试程序；桌面应用与 GPU 渲染将在
+后续阶段加入。

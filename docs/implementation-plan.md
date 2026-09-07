@@ -74,6 +74,8 @@ assets/presets/       可复现的艺术预设
 
 ## 6. 分阶段实施
 
+当前进度：阶段 A 已完成并通过 Debug/Release 测试；阶段 B 为下一步。
+
 ### 阶段 A：可验证的 CPU 数学核心
 
 - 实现边函数、导数、Coons 映射与 Jacobian。
