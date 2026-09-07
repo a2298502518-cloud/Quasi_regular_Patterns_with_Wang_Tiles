@@ -1,0 +1,29 @@
+# Build systems
+/build/
+/build-*/
+/cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
+
+# IDE and platform-local files
+/.vs/
+/.vscode/
+*.user
+*.suo
+
+# Generated outputs and caches
+/output/
+/out/
+/tmp/
+/.cache/
+*.log
+
+# Compiled artifacts
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.a
