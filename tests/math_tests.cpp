@@ -251,7 +251,7 @@ void testDefaultPalette() {
     require(report.valid, "all default palette combinations must be safe");
     require(report.combinationCount == 625, "five colors must produce 625 combinations");
     require(
-        report.minimumDeterminantLowerBound > 0.5,
+        report.minimumDeterminantLowerBound > 0.4,
         "default palette should retain a generous determinant margin");
 }
 

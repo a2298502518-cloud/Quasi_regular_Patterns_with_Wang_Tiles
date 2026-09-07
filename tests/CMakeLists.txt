@@ -12,3 +12,18 @@ else()
 endif()
 
 add_test(NAME qrp_math_tests COMMAND qrp_math_tests)
+
+add_executable(qrp_pipeline_tests
+    pipeline_tests.cpp
+)
+
+target_link_libraries(qrp_pipeline_tests PRIVATE qrp_render)
+target_compile_features(qrp_pipeline_tests PRIVATE cxx_std_20)
+
+if(MSVC)
+    target_compile_options(qrp_pipeline_tests PRIVATE /W4 /permissive- /utf-8)
+else()
+    target_compile_options(qrp_pipeline_tests PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+add_test(NAME qrp_pipeline_tests COMMAND qrp_pipeline_tests)

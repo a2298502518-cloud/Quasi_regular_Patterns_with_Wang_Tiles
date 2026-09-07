@@ -29,7 +29,56 @@ add_library(qrp_model STATIC
 target_link_libraries(qrp_model PUBLIC qrp_math)
 target_compile_features(qrp_model PUBLIC cxx_std_20)
 
-foreach(target qrp_math qrp_model)
+add_library(qrp_generators STATIC
+    src/generators/HybridTorusGenerator.cpp
+    src/generators/PeriodicGradientNoise.cpp
+    src/generators/TorusFourier.cpp
+)
+
+target_link_libraries(qrp_generators PUBLIC qrp_math)
+target_compile_features(qrp_generators PUBLIC cxx_std_20)
+
+add_library(qrp_color STATIC
+    src/color/GradientPalette.cpp
+)
+
+target_include_directories(qrp_color
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(qrp_color PUBLIC cxx_std_20)
+
+add_library(qrp_render STATIC
+    src/export/PpmWriter.cpp
+    src/render/CpuReferenceRenderer.cpp
+    src/render/Image.cpp
+)
+
+target_link_libraries(qrp_render
+    PUBLIC
+        qrp_color
+        qrp_generators
+        qrp_math
+        qrp_model
+)
+target_compile_features(qrp_render PUBLIC cxx_std_20)
+
+add_executable(qrp_cpu_reference
+    apps/cpu_reference_main.cpp
+)
+
+target_link_libraries(qrp_cpu_reference PRIVATE qrp_render)
+target_compile_features(qrp_cpu_reference PRIVATE cxx_std_20)
+
+foreach(target
+    qrp_math
+    qrp_model
+    qrp_generators
+    qrp_color
+    qrp_render
+    qrp_cpu_reference
+)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
     else()

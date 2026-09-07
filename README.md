@@ -6,13 +6,16 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 
 ## 当前状态
 
-CPU 数学核心阶段已经完成，下一阶段将建立 CPU 基准图和接缝证明。当前仓库包含：
+CPU 数学核心与 CPU 基准渲染阶段已经完成。当前仓库包含：
 
 - 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
 - [实现计划](./docs/implementation-plan.md)
 - [数学与坐标规范](./docs/math-spec.md)
 - [验证方案](./docs/validation.md)
+- [CPU 基准与复现记录](./docs/cpu-baselines.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
+- 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
+- 单瓦片、2 x 2 与三套 10 x 10 固定种子基准，以及独立接缝误差热图
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
 周期条件的论证，不直接作为代码契约。
@@ -40,5 +43,11 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-当前构建只产生 CPU 数学库、边调色板模型和参考测试程序；桌面应用与 GPU 渲染将在
-后续阶段加入。
+生成可复现的 CPU 基准图（PPM 文件和误差热图写入被 Git 忽略的输出目录）：
+
+```powershell
+.\build\Release\qrp_cpu_reference.exe output\cpu
+```
+
+当前构建产生 CPU 数学、生成器、颜色、参考渲染库与测试程序。桌面应用与 GPU 渲染是
+下一阶段工作。

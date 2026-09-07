@@ -12,10 +12,10 @@ EdgePalette EdgePalette::createDefault() {
     using math::EdgeParameters;
     return EdgePalette({
         EdgeFunction(EdgeParameters{0.0, 0.0}),
-        EdgeFunction(EdgeParameters{0.035, 0.0}),
-        EdgeFunction(EdgeParameters{-0.035, 0.0}),
-        EdgeFunction(EdgeParameters{0.0, 0.025}),
-        EdgeFunction(EdgeParameters{0.0, -0.025}),
+        EdgeFunction(EdgeParameters{0.044, 0.012}),
+        EdgeFunction(EdgeParameters{-0.041, 0.018}),
+        EdgeFunction(EdgeParameters{0.014, -0.041}),
+        EdgeFunction(EdgeParameters{-0.018, -0.039}),
     });
 }
 
