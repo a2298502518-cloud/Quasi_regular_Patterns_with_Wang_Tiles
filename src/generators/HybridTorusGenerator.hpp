@@ -4,6 +4,8 @@
 #include "generators/TorusFourier.hpp"
 #include "generators/TorusGenerator.hpp"
 
+#include <array>
+
 namespace qrp::generators {
 
 struct HybridGeneratorSettings {
@@ -17,6 +19,14 @@ struct HybridGeneratorSettings {
     double worldFrequencyY = 0.091;
 };
 
+struct TileVariationDescriptor {
+    double firstDomainPhase = 0.0;
+    double secondDomainPhase = 0.0;
+    std::array<int, 4> frequencyU{};
+    std::array<int, 4> frequencyV{};
+    std::array<double, 4> phase{};
+};
+
 class HybridTorusGenerator final : public TorusGenerator {
 public:
     HybridTorusGenerator(
@@ -25,16 +35,20 @@ public:
         HybridGeneratorSettings settings = {});
 
     [[nodiscard]] const HybridGeneratorSettings& settings() const noexcept;
+    [[nodiscard]] const TorusFourier& fourier() const noexcept;
+    [[nodiscard]] const PeriodicGradientNoise& noise() const noexcept;
+    [[nodiscard]] static TileVariationDescriptor describeTile(
+        std::uint64_t tileSeed) noexcept;
     [[nodiscard]] double evaluateBase(math::Vec2 parameter) const noexcept;
     [[nodiscard]] double evaluate(const GeneratorInput& input) const noexcept override;
 
 private:
     [[nodiscard]] static double tileVariation(
         math::Vec2 parameter,
-        std::uint64_t tileSeed) noexcept;
+        const TileVariationDescriptor& descriptor) noexcept;
     [[nodiscard]] static math::Vec2 tileDomainOffset(
         math::Vec2 parameter,
-        std::uint64_t tileSeed) noexcept;
+        const TileVariationDescriptor& descriptor) noexcept;
 
     TorusFourier fourier_;
     PeriodicGradientNoise noise_;

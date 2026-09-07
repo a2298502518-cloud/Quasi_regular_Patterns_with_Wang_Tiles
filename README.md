@@ -6,16 +6,18 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 
 ## 当前状态
 
-CPU 数学核心与 CPU 基准渲染阶段已经完成。当前仓库包含：
+CPU 数学核心、CPU 基准渲染与 GPU 实时渲染阶段已经完成。当前仓库包含：
 
 - 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
 - [实现计划](./docs/implementation-plan.md)
 - [数学与坐标规范](./docs/math-spec.md)
 - [验证方案](./docs/validation.md)
 - [CPU 基准与复现记录](./docs/cpu-baselines.md)
+- [GPU 基准与一致性记录](./docs/gpu-baselines.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 - 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
 - 单瓦片、2 x 2 与三套 10 x 10 固定种子基准，以及独立接缝误差热图
+- OpenGL 4.3 实时主视图、相机平移缩放和 Jacobian/Newton/瓦片边界调试视图
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
 周期条件的论证，不直接作为代码契约。
@@ -49,5 +51,27 @@ ctest --test-dir build -C Release --output-on-failure
 .\build\Release\qrp_cpu_reference.exe output\cpu
 ```
 
-当前构建产生 CPU 数学、生成器、颜色、参考渲染库与测试程序。桌面应用与 GPU 渲染是
-下一阶段工作。
+当前构建产生 CPU 参考工具、测试程序和 GPU 实时桌面应用。参数编辑与完整视觉 UI
+属于下一阶段。
+
+运行实时程序：
+
+```powershell
+.\build\Release\qrp_realtime.exe
+```
+
+- 鼠标左键拖动：平移。
+- 滚轮：以光标为中心缩放。
+- `1`–`5`：切换固定预设。
+- `D`：切换图案、Jacobian、Newton 残差和瓦片边界视图。
+- `R`：重置相机；`Esc`：退出。
+
+运行隐藏窗口的 GPU/CPU 分阶段一致性检查：
+
+```powershell
+cmake --build build --config Release --target qrp_gpu_validate
+```
+
+实时目标通过 CMake 固定并获取 GLFW 3.4；仓库内包含由 glad 2.0.8 生成的纯 OpenGL
+4.3 core loader，因此构建不依赖额外 Python 包。若只需要 CPU 目标，可在配置时传入
+`-DQRP_BUILD_REALTIME=OFF`。

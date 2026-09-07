@@ -18,6 +18,9 @@ public:
     explicit PeriodicGradientNoise(PeriodicNoiseSettings settings = {});
 
     [[nodiscard]] const PeriodicNoiseSettings& settings() const noexcept;
+    [[nodiscard]] math::Vec2 gradientAt(
+        std::uint32_t x,
+        std::uint32_t y) const noexcept;
     [[nodiscard]] double evaluate(math::Vec2 parameter) const noexcept;
 
 private:

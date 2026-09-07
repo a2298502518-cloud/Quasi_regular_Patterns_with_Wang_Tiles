@@ -22,7 +22,8 @@ ctest --test-dir build -C Release --output-on-failure
 ## 3. 固定基线
 
 生成器设置的列依次为 Fourier 权重、噪声权重、瓦片标量变化、瓦片域扰动、世界标量
-调制、世界域扰动、世界频率 X、世界频率 Y。代码中的 `BaselinePreset` 是权威快照。
+调制、世界域扰动、世界频率 X、世界频率 Y。代码中的 `PatternPreset` 是权威快照，
+CPU 与 GPU 应用共同使用它。
 
 | 名称 | 网格 | 像素/瓦片 | Wang 种子 | 生成器设置 | 调色板 |
 | --- | ---: | ---: | --- | --- | --- |

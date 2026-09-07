@@ -82,6 +82,12 @@ const PeriodicNoiseSettings& PeriodicGradientNoise::settings() const noexcept {
     return settings_;
 }
 
+math::Vec2 PeriodicGradientNoise::gradientAt(
+    const std::uint32_t x,
+    const std::uint32_t y) const noexcept {
+    return gradient(x, y, settings_.seed);
+}
+
 double PeriodicGradientNoise::evaluate(const math::Vec2 parameter) const noexcept {
     double value = 0.0;
     double amplitude = 1.0;
@@ -110,10 +116,10 @@ double PeriodicGradientNoise::evaluateOctave(
     const auto gy0 = wrap(y0, frequency);
     const auto gx1 = wrap(x0 + 1, frequency);
     const auto gy1 = wrap(y0 + 1, frequency);
-    const auto g00 = gradient(gx0, gy0, settings_.seed);
-    const auto g10 = gradient(gx1, gy0, settings_.seed);
-    const auto g01 = gradient(gx0, gy1, settings_.seed);
-    const auto g11 = gradient(gx1, gy1, settings_.seed);
+    const auto g00 = gradientAt(gx0, gy0);
+    const auto g10 = gradientAt(gx1, gy0);
+    const auto g01 = gradientAt(gx0, gy1);
+    const auto g11 = gradientAt(gx1, gy1);
 
     const double n00 = dot(g00, math::Vec2{localX, localY});
     const double n10 = dot(g10, math::Vec2{localX - 1.0, localY});
