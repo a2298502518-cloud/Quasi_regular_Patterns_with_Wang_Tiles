@@ -58,7 +58,7 @@ void drawGenerator(generators::HybridGeneratorSettings& settings) {
     sliderDouble("Tile variation", settings.tileVariationAmplitude, 0.0, 0.8);
     sliderDouble("Tile domain warp", settings.tileDomainWarpAmplitude, 0.0, 0.5);
     sliderDouble("World modulation", settings.worldModulationAmplitude, 0.0, 0.8);
-    sliderDouble("World domain warp", settings.worldDomainWarpAmplitude, 0.0, 0.5);
+    sliderDouble("World domain warp", settings.worldDomainWarpAmplitude, 0.0, 1.25);
     sliderDouble("World frequency X", settings.worldFrequencyX, -0.5, 0.5, "%.4f");
     sliderDouble("World frequency Y", settings.worldFrequencyY, -0.5, 0.5, "%.4f");
 }
@@ -109,6 +109,14 @@ void drawColorRamp(
         }
         ImGui::PopID();
     }
+}
+
+void drawMaterial(color::MaterialSettings& material) {
+    ImGui::TextDisabled("Derivative effects fade to zero near every Wang boundary.");
+    sliderDouble("Contour frequency", material.contourFrequency, 0.0, 24.0, "%.1f");
+    sliderDouble("Contour strength", material.contourStrength, 0.0, 0.35);
+    sliderDouble("Contour width", material.contourWidth, 0.01, 0.25);
+    sliderDouble("Relief strength", material.reliefStrength, 0.0, 0.65);
 }
 
 } // namespace
@@ -207,6 +215,9 @@ EditorActions PatternEditor::draw(
     }
     if (ImGui::CollapsingHeader("Color and tone")) {
         drawColorRamp(draft.colorStops, draft.tone);
+    }
+    if (ImGui::CollapsingHeader("Contours and material", ImGuiTreeNodeFlags_DefaultOpen)) {
+        drawMaterial(draft.material);
     }
     if (ImGui::CollapsingHeader("Diagnostics")) {
         int selected = static_cast<int>(debugView);

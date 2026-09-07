@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -138,6 +139,18 @@ void testGradientPalettesStayFiniteAndBounded() {
     }
 }
 
+void testPaletteUsesPerceptualInterpolation() {
+    const qrp::color::GradientPalette palette({
+        {0.0, {0.0, 0.0, 0.0}},
+        {1.0, {1.0, 1.0, 1.0}},
+    }, qrp::color::ToneSettings{0.0, 1.0, 0.0, 0.0});
+    const auto midpoint = palette.sample(0.0);
+    // Oklab 的 L=0.5 转回线性 sRGB 约为 0.125；直接 RGB 插值会错误地产生 0.5。
+    requireNear(midpoint.red, 0.125, 2.0e-5, "Oklab midpoint red");
+    requireNear(midpoint.green, 0.125, 2.0e-5, "Oklab midpoint green");
+    requireNear(midpoint.blue, 0.125, 2.0e-5, "Oklab midpoint blue");
+}
+
 void testMeasuredSeams() {
     const auto edgePalette = qrp::model::EdgePalette::createDefault();
     const qrp::model::WangGrid grid(7, 5, 5, 0xdecafbad98765432ULL);
@@ -232,6 +245,32 @@ void testProjectDraftCommitTransaction() {
     require(!project.isDirty(), "Reset Draft must restore committed parameters");
 }
 
+void testMaterialSettingsCommitAtomically() {
+    const auto presets = qrp::presets::createBaselinePresets();
+    qrp::project::PatternProject project(
+        qrp::project::configurationFromPreset(presets.at(3)));
+    const auto firstRevision = project.revision();
+    project.draft().material.reliefStrength = 0.31;
+    require(project.isDirty(), "material edit must remain in draft");
+    requireNear(
+        project.scene().material.reliefStrength,
+        presets.at(3).material.reliefStrength,
+        0.0,
+        "committed material before Apply");
+
+    const auto success = project.applyDraft();
+    require(success.applied, "valid material draft must commit");
+    require(project.revision() == firstRevision + 1, "material Apply must increment revision");
+    requireNear(project.scene().material.reliefStrength, 0.31, 0.0, "committed material");
+
+    const auto committed = project.committed();
+    project.draft().material.contourStrength = std::numeric_limits<double>::quiet_NaN();
+    const auto failed = project.applyDraft();
+    require(!failed.applied, "non-finite material draft must be rejected");
+    require(project.committed() == committed, "failed material Apply must preserve committed state");
+    require(project.revision() == firstRevision + 1, "failed material Apply must preserve revision");
+}
+
 } // namespace
 
 int main() {
@@ -239,9 +278,11 @@ int main() {
         {"torus generator periodicity", testTorusGeneratorsArePeriodic},
         {"tile variation boundary", testTileVariationVanishesOnBoundary},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
+        {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
         {"measured seams", testMeasuredSeams},
         {"CPU reference render", testCpuReferenceRender},
         {"project draft/commit transaction", testProjectDraftCommitTransaction},
+        {"material settings transaction", testMaterialSettingsCommitAtomically},
     };
 
     int failures = 0;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "color/GradientPalette.hpp"
+#include "color/MaterialSettings.hpp"
 #include "generators/HybridTorusGenerator.hpp"
 #include "math/EdgeFunction.hpp"
 #include "model/EdgePalette.hpp"
@@ -26,6 +27,7 @@ struct PatternConfiguration {
     generators::HybridGeneratorSettings generator;
     std::vector<color::ColorStop> colorStops;
     color::ToneSettings tone;
+    color::MaterialSettings material;
 
     [[nodiscard]] bool operator==(const PatternConfiguration&) const noexcept = default;
 };
@@ -35,6 +37,7 @@ struct PatternScene {
     model::WangGrid grid;
     generators::HybridTorusGenerator generator;
     color::GradientPalette colorPalette;
+    color::MaterialSettings material;
 };
 
 struct ApplyResult {

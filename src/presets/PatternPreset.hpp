@@ -1,6 +1,7 @@
 #pragma once
 
 #include "color/GradientPalette.hpp"
+#include "color/MaterialSettings.hpp"
 #include "generators/HybridTorusGenerator.hpp"
 
 #include <cstddef>
@@ -18,6 +19,7 @@ struct PatternPreset {
     std::uint64_t gridSeed = 0;
     generators::HybridGeneratorSettings generator;
     color::GradientPalette palette;
+    color::MaterialSettings material;
 };
 
 [[nodiscard]] std::vector<PatternPreset> createBaselinePresets();

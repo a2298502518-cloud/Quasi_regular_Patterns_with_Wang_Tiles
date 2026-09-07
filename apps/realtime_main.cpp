@@ -525,7 +525,8 @@ int main(int argc, char** argv) {
                 scene.grid,
                 scene.edgePalette,
                 scene.generator,
-                scene.colorPalette);
+                scene.colorPalette,
+                scene.material);
         };
         uploadCommittedScene();
         int framebufferWidth = initialWidth;
@@ -572,7 +573,12 @@ int main(int argc, char** argv) {
                 renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
                 editorRuntime.render();
             } else {
-                renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
+                renderer.draw(
+                    framebufferWidth,
+                    framebufferHeight,
+                    state.camera,
+                    state.debugView,
+                    !options.validate);
             }
             glFinish();
             const auto gpuImage = readFramebuffer(framebufferWidth, framebufferHeight);

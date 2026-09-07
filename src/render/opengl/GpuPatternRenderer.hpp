@@ -1,6 +1,7 @@
 #pragma once
 
 #include "color/GradientPalette.hpp"
+#include "color/MaterialSettings.hpp"
 #include "generators/HybridTorusGenerator.hpp"
 #include "model/EdgePalette.hpp"
 #include "model/WangGrid.hpp"
@@ -45,12 +46,14 @@ public:
         const model::WangGrid& grid,
         const model::EdgePalette& edgePalette,
         const generators::HybridTorusGenerator& generator,
-        const color::GradientPalette& colorPalette);
+        const color::GradientPalette& colorPalette,
+        const color::MaterialSettings& material);
     void draw(
         int framebufferWidth,
         int framebufferHeight,
         const Camera2D& camera,
-        DebugView debugView) const;
+        DebugView debugView,
+        bool enableMaterial = true) const;
     [[nodiscard]] GpuValidationBuffers renderValidationBuffers(
         int width,
         int height,
@@ -63,6 +66,7 @@ private:
     GLuint vertexArray_ = 0;
     GLuint tileBuffer_ = 0;
     GLuint gradientTexture_ = 0;
+    color::MaterialSettings material_;
     bool sceneUploaded_ = false;
 };
 

@@ -68,12 +68,16 @@ void GpuPatternRenderer::uploadScene(
     const model::WangGrid& grid,
     const model::EdgePalette& edgePalette,
     const generators::HybridTorusGenerator& generator,
-    const color::GradientPalette& colorPalette) {
+    const color::GradientPalette& colorPalette,
+    const color::MaterialSettings& material) {
     if (!grid.hasValidAdjacency() || grid.colorCount() != edgePalette.colors().size()) {
         throw std::invalid_argument("Cannot upload an invalid Wang scene.");
     }
     if (!edgePalette.validateAllCombinations().valid) {
         throw std::invalid_argument("Cannot upload an unsafe edge palette.");
+    }
+    if (!color::isValid(material)) {
+        throw std::invalid_argument("Cannot upload invalid material settings.");
     }
     if (grid.width() > static_cast<std::size_t>(std::numeric_limits<GLint>::max())
         || grid.height() > static_cast<std::size_t>(std::numeric_limits<GLint>::max())
@@ -235,6 +239,7 @@ void GpuPatternRenderer::uploadScene(
         narrow(tone.contrast),
         narrow(tone.bandFrequency),
         narrow(tone.bandStrength));
+    material_ = material;
 
     const auto& settings = generator.settings();
     glUniform4f(
@@ -260,7 +265,8 @@ void GpuPatternRenderer::draw(
     const int framebufferWidth,
     const int framebufferHeight,
     const Camera2D& camera,
-    const DebugView debugView) const {
+    const DebugView debugView,
+    const bool enableMaterial) const {
     if (!sceneUploaded_) {
         throw std::logic_error("A GPU scene must be uploaded before drawing.");
     }
@@ -282,6 +288,12 @@ void GpuPatternRenderer::draw(
         narrow(camera.originY));
     glUniform1f(uniformLocation("u_pixelsPerTile"), narrow(camera.pixelsPerTile));
     glUniform1i(uniformLocation("u_debugView"), static_cast<GLint>(debugView));
+    glUniform4f(
+        uniformLocation("u_materialSettings"),
+        enableMaterial ? narrow(material_.contourFrequency) : 0.0F,
+        enableMaterial ? narrow(material_.contourStrength) : 0.0F,
+        narrow(material_.contourWidth),
+        enableMaterial ? narrow(material_.reliefStrength) : 0.0F);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gradientTexture_);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, tileBuffer_);
@@ -341,7 +353,7 @@ GpuValidationBuffers GpuPatternRenderer::renderValidationBuffers(
             throw std::runtime_error("GPU validation framebuffer is incomplete.");
         }
 
-        draw(width, height, camera, DebugView::Pattern);
+        draw(width, height, camera, DebugView::Pattern, false);
         glFinish();
         GpuValidationBuffers result;
         result.width = width;

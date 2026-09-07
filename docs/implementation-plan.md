@@ -74,9 +74,8 @@ assets/presets/       可复现的艺术预设
 
 ## 6. 分阶段实施
 
-当前进度：阶段 A、B、C 已完成并通过 Debug/Release 测试、GPU/CPU 分阶段对照与实际
-图像检查；阶段 D 已完成参数编辑与 draft/committed 事务模型，视觉材质与导出衔接仍在
-继续打磨。
+当前进度：阶段 A、B、C、D 已完成并通过 CPU/GPU 分阶段对照、draft/committed 事务
+测试、三套展示预设及高低缩放视觉检查；阶段 E 为下一步。
 
 ### 阶段 A：可验证的 CPU 数学核心
 

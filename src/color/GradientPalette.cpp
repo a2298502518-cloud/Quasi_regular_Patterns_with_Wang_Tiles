@@ -48,6 +48,51 @@ namespace {
     };
 }
 
+// Oklab 在感知上比直接线性 RGB 混合更均匀；输入和输出仍是线性 sRGB。
+[[nodiscard]] Color3 linearRgbToOklab(const Color3 color) noexcept {
+    const double l = 0.4122214708 * color.red
+        + 0.5363325363 * color.green + 0.0514459929 * color.blue;
+    const double m = 0.2119034982 * color.red
+        + 0.6806995451 * color.green + 0.1073969566 * color.blue;
+    const double s = 0.0883024619 * color.red
+        + 0.2817188376 * color.green + 0.6299787005 * color.blue;
+    const double lRoot = std::cbrt(l);
+    const double mRoot = std::cbrt(m);
+    const double sRoot = std::cbrt(s);
+    return {
+        0.2104542553 * lRoot + 0.7936177850 * mRoot - 0.0040720468 * sRoot,
+        1.9779984951 * lRoot - 2.4285922050 * mRoot + 0.4505937099 * sRoot,
+        0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.8086757660 * sRoot,
+    };
+}
+
+[[nodiscard]] Color3 oklabToLinearRgb(const Color3 color) noexcept {
+    const double lRoot = color.red + 0.3963377774 * color.green
+        + 0.2158037573 * color.blue;
+    const double mRoot = color.red - 0.1055613458 * color.green
+        - 0.0638541728 * color.blue;
+    const double sRoot = color.red - 0.0894841775 * color.green
+        - 1.2914855480 * color.blue;
+    const double l = lRoot * lRoot * lRoot;
+    const double m = mRoot * mRoot * mRoot;
+    const double s = sRoot * sRoot * sRoot;
+    return {
+        std::clamp(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, 0.0, 1.0),
+        std::clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, 0.0, 1.0),
+        std::clamp(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s, 0.0, 1.0),
+    };
+}
+
+[[nodiscard]] Color3 interpolateOklab(
+    const Color3 first,
+    const Color3 second,
+    const double amount) noexcept {
+    return oklabToLinearRgb(interpolate(
+        linearRgbToOklab(first),
+        linearRgbToOklab(second),
+        amount));
+}
+
 } // namespace
 
 GradientPalette::GradientPalette(
@@ -157,7 +202,7 @@ Color3 GradientPalette::sample(const double scalar) const noexcept {
     const auto& first = *(upper - 1);
     const double local = (coordinate - first.position)
         / (second.position - first.position);
-    return interpolate(first.color, second.color, smoothstep(local));
+    return interpolateOklab(first.color, second.color, smoothstep(local));
 }
 
 double maximumChannelDifference(const Color3 first, const Color3 second) noexcept {

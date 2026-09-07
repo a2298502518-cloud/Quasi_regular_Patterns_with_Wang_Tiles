@@ -40,6 +40,7 @@ namespace {
             generators::TorusFourier::createQuasiRegular(),
             generators::PeriodicGradientNoise{}),
         color::GradientPalette::createMidnightGold(),
+        {},
     };
 }
 
@@ -56,6 +57,7 @@ PatternConfiguration configurationFromPreset(const presets::PatternPreset& prese
         preset.generator,
         preset.palette.stops(),
         preset.palette.tone(),
+        preset.material,
     };
 }
 
@@ -156,6 +158,10 @@ std::pair<std::optional<PatternScene>, ApplyResult> PatternProject::buildScene(
         result.message = "Generator settings must be finite.";
         return {std::nullopt, result};
     }
+    if (!color::isValid(configuration.material)) {
+        result.message = "Material settings are outside their safe ranges.";
+        return {std::nullopt, result};
+    }
 
     try {
         std::vector<math::EdgeFunction> edges;
@@ -183,6 +189,7 @@ std::pair<std::optional<PatternScene>, ApplyResult> PatternProject::buildScene(
                 generators::PeriodicGradientNoise{},
                 configuration.generator),
             color::GradientPalette(configuration.colorStops, configuration.tone),
+            configuration.material,
         };
         result.applied = true;
         result.message = "Committed after validating every edge-color combination.";

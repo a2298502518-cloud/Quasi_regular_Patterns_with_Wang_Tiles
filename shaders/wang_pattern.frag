@@ -37,6 +37,7 @@ uniform int u_colorStopCount;
 uniform float u_colorStopPosition[8];
 uniform vec3 u_colorStopValue[8];
 uniform vec4 u_toneSettings;
+uniform vec4 u_materialSettings;
 
 uniform vec4 u_generatorWeights;
 uniform vec4 u_worldSettings;
@@ -239,13 +240,41 @@ float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
         + u_worldSettings.x * sin(worldPhase);
 }
 
-vec3 samplePalette(float scalar) {
+float toneCoordinate(float scalar) {
     float coordinate = 0.5 + 0.5 * tanh(u_toneSettings.y * (scalar - u_toneSettings.x));
     if (u_toneSettings.z > 0.0 && u_toneSettings.w > 0.0) {
         float band = 0.5 + 0.5 * sin(tau * u_toneSettings.z * coordinate);
         coordinate = mix(coordinate, band, u_toneSettings.w);
     }
-    coordinate = clamp(coordinate, 0.0, 1.0);
+    return clamp(coordinate, 0.0, 1.0);
+}
+
+vec3 linearRgbToOklab(vec3 color) {
+    vec3 lms = mat3(
+        0.4122214708, 0.2119034982, 0.0883024619,
+        0.5363325363, 0.6806995451, 0.2817188376,
+        0.0514459929, 0.1073969566, 0.6299787005) * color;
+    vec3 roots = sign(lms) * pow(abs(lms), vec3(1.0 / 3.0));
+    return mat3(
+        0.2104542553, 1.9779984951, 0.0259040371,
+        0.7936177850, -2.4285922050, 0.7827717662,
+        -0.0040720468, 0.4505937099, -0.8086757660) * roots;
+}
+
+vec3 oklabToLinearRgb(vec3 color) {
+    vec3 roots = mat3(
+        1.0, 1.0, 1.0,
+        0.3963377774, -0.1055613458, -0.0894841775,
+        0.2158037573, -0.0638541728, -1.2914855480) * color;
+    vec3 lms = roots * roots * roots;
+    return clamp(mat3(
+        4.0767416621, -1.2684380046, -0.0041960863,
+        -3.3077115913, 2.6097574011, -0.7034186147,
+        0.2309699292, -0.3413193965, 1.7076147010) * lms, 0.0, 1.0);
+}
+
+vec3 samplePalette(float scalar) {
+    float coordinate = toneCoordinate(scalar);
 
     for (int index = 1; index < 8; ++index) {
         if (index >= u_colorStopCount || coordinate <= u_colorStopPosition[index]) {
@@ -256,13 +285,43 @@ vec3 samplePalette(float scalar) {
             float local = interval > 0.0
                 ? (coordinate - u_colorStopPosition[firstIndex]) / interval
                 : 0.0;
-            return mix(
-                u_colorStopValue[firstIndex],
-                u_colorStopValue[secondIndex],
-                smoothstep(0.0, 1.0, local));
+            vec3 first = linearRgbToOklab(u_colorStopValue[firstIndex]);
+            vec3 second = linearRgbToOklab(u_colorStopValue[secondIndex]);
+            return oklabToLinearRgb(mix(
+                first,
+                second,
+                smoothstep(0.0, 1.0, local)));
         }
     }
     return u_colorStopValue[u_colorStopCount - 1];
+}
+
+vec3 applyMaterial(vec3 linearColor, float scalar, vec2 parameter) {
+    float safe = boundaryWindow(parameter);
+    float contourFrequency = u_materialSettings.x;
+    float contourStrength = u_materialSettings.y;
+    if (contourFrequency > 0.0 && contourStrength > 0.0) {
+        float phase = toneCoordinate(scalar) * contourFrequency;
+        float distanceToLine = abs(fract(phase + 0.5) - 0.5);
+        float antialiasWidth = max(fwidth(phase), 1.0e-4);
+        float contour = 1.0 - smoothstep(
+            u_materialSettings.z,
+            u_materialSettings.z + antialiasWidth,
+            distanceToLine);
+        linearColor *= 1.0 - safe * contourStrength * contour;
+    }
+
+    float reliefStrength = u_materialSettings.w;
+    if (reliefStrength > 0.0) {
+        // 屏幕导数跨接缝不保证一致，因此所有法线效果都由边界窗口平滑归零。
+        vec2 slope = vec2(dFdx(scalar), dFdy(scalar)) * u_pixelsPerTile;
+        vec3 normal = normalize(vec3(-0.12 * slope, 1.0));
+        const vec3 light = normalize(vec3(-0.45, 0.55, 0.82));
+        float neutralLight = light.z;
+        float relief = dot(normal, light) - neutralLight;
+        linearColor *= max(0.65, 1.0 + safe * reliefStrength * relief);
+    }
+    return clamp(linearColor, 0.0, 1.0);
 }
 
 vec3 linearToSrgb(vec3 linearColor) {
@@ -325,7 +384,10 @@ void main() {
         float intensity = clamp(log2(1.0 + residual * 2.0e6) / 8.0, 0.0, 1.0);
         color = mix(vec3(0.01, 0.03, 0.06), vec3(1.0, 0.18, 0.02), intensity);
     } else {
-        color = linearToSrgb(linearColor);
+        vec3 displayLinear = u_materialSettings.y > 0.0 || u_materialSettings.w > 0.0
+            ? applyMaterial(linearColor, scalar, parameter)
+            : linearColor;
+        color = linearToSrgb(displayLinear);
         if (u_debugView == 3) {
             vec2 local = fract(world);
             float edgeDistance = min(

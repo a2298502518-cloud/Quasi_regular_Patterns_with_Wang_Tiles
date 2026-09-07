@@ -6,7 +6,7 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 
 ## 当前状态
 
-CPU 数学核心、CPU 基准渲染、GPU 实时渲染与第一版参数编辑器已经完成。当前仓库包含：
+CPU 数学核心、CPU 基准渲染、GPU 实时渲染和交互视觉系统已经完成。当前仓库包含：
 
 - 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
 - [实现计划](./docs/implementation-plan.md)
@@ -21,6 +21,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染与第一版参数编辑�
 - OpenGL 4.3 实时主视图、相机平移缩放和 Jacobian/Newton/瓦片边界调试视图
 - 可编辑 Wang 网格、边函数、生成器和色带的 Dear ImGui 面板
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
+- CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
 周期条件的论证，不直接作为代码契约。
