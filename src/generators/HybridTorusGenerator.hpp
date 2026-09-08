@@ -30,6 +30,7 @@ struct HybridGeneratorSettings {
     ScalarProfile scalarProfile = ScalarProfile::Natural;
     double worldGrainAmplitude = 0.0;
     double cellularScale = 0.75;
+    double edgeStructureAmplitude = 0.0;
 
     [[nodiscard]] bool operator==(const HybridGeneratorSettings&) const noexcept = default;
 };
@@ -64,6 +65,10 @@ private:
     [[nodiscard]] static double cellularField(
         math::Vec2 world,
         double scale) noexcept;
+    [[nodiscard]] static double edgeConnectedInk(
+        math::Vec2 parameter,
+        const std::array<std::uint32_t, 4>& edgeColors,
+        const TileVariationDescriptor& descriptor) noexcept;
     [[nodiscard]] static double tileVariation(
         math::Vec2 parameter,
         const TileVariationDescriptor& descriptor) noexcept;

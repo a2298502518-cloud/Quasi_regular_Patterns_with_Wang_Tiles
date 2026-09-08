@@ -44,7 +44,7 @@ uniform vec4 u_generatorWeights;
 uniform vec4 u_worldSettings;
 uniform int u_scalarProfile;
 uniform float u_worldDetailAmplitude;
-uniform vec2 u_styleStructureSettings;
+uniform vec3 u_styleStructureSettings;
 
 const float pi = 3.14159265358979323846;
 const float tau = 6.28318530717958647692;
@@ -273,6 +273,133 @@ float cellularField(vec2 world, float scale) {
     return -0.95 + edgeBlend * (regionValue + 0.95);
 }
 
+float softBump(float coordinate, float center, float halfWidth) {
+    float amount = clamp(1.0 - abs(coordinate - center) / halfWidth, 0.0, 1.0);
+    return amount * amount * (3.0 - 2.0 * amount);
+}
+
+float edgeInkCenter(uint color) {
+    ivec2 key = ivec2(int(color), 0);
+    return 0.18 + 0.64 * unitFloat24(hashCell(key, 0x6d2b79f5u));
+}
+
+float edgeInkWidth(uint color) {
+    ivec2 key = ivec2(int(color), 0);
+    return 0.038 + 0.018 * unitFloat24(hashCell(key, 0x1b873593u));
+}
+
+float smoothUnit(float value) {
+    float amount = clamp(value, 0.0, 1.0);
+    return amount * amount * (3.0 - 2.0 * amount);
+}
+
+float segmentInk(
+    vec2 point,
+    vec2 first,
+    vec2 second,
+    float firstWidth,
+    float secondWidth) {
+    vec2 direction = second - first;
+    float lengthSquared = dot(direction, direction);
+    float amount = lengthSquared > 0.0
+        ? clamp(dot(point - first, direction) / lengthSquared, 0.0, 1.0)
+        : 0.0;
+    vec2 offset = point - mix(first, second, amount);
+    float width = mix(firstWidth, secondWidth, amount);
+    return softBump(length(offset), 0.0, width);
+}
+
+float cubicInk(
+    vec2 point,
+    vec2 start,
+    vec2 firstControl,
+    vec2 secondControl,
+    vec2 end,
+    float startWidth,
+    float endWidth) {
+    float coverage = 0.0;
+    vec2 previous = start;
+    float previousWidth = startWidth;
+    for (int segment = 1; segment <= 16; ++segment) {
+        float amount = float(segment) / 16.0;
+        float inverse = 1.0 - amount;
+        vec2 current = inverse * inverse * inverse * start
+            + 3.0 * inverse * inverse * amount * firstControl
+            + 3.0 * inverse * amount * amount * secondControl
+            + amount * amount * amount * end;
+        float currentWidth = mix(startWidth, endWidth, amount);
+        coverage = max(
+            coverage,
+            segmentInk(point, previous, current, previousWidth, currentWidth));
+        previous = current;
+        previousWidth = currentWidth;
+    }
+    return coverage;
+}
+
+float boundaryInkStroke(uint color, float tangent, float inward) {
+    float reach = 1.0 - smoothUnit(inward / 0.20);
+    return reach * softBump(
+        tangent,
+        edgeInkCenter(color),
+        edgeInkWidth(color));
+}
+
+float edgeConnectedInk(vec2 parameter, TileData tile) {
+    vec2 endpoints[4] = vec2[4](
+        vec2(edgeInkCenter(tile.edges.x), 0.0),
+        vec2(edgeInkCenter(tile.edges.y), 1.0),
+        vec2(0.0, edgeInkCenter(tile.edges.z)),
+        vec2(1.0, edgeInkCenter(tile.edges.w)));
+    vec2 inwardDirections[4] = vec2[4](
+        vec2(0.0, 1.0),
+        vec2(0.0, -1.0),
+        vec2(1.0, 0.0),
+        vec2(-1.0, 0.0));
+    float widths[4] = float[4](
+        edgeInkWidth(tile.edges.x),
+        edgeInkWidth(tile.edges.y),
+        edgeInkWidth(tile.edges.z),
+        edgeInkWidth(tile.edges.w));
+    int pairing = (tile.frequencyU[0] + tile.frequencyV[1]) % 3;
+    ivec4 pairs;
+    if (pairing == 0) {
+        pairs = ivec4(0, 1, 2, 3);
+    } else if (pairing == 1) {
+        pairs = ivec4(0, 2, 1, 3);
+    } else {
+        pairs = ivec4(0, 3, 1, 2);
+    }
+    float firstStartReach = 0.25 + 0.06 * sin(tile.phaseA.z);
+    float firstEndReach = 0.25 + 0.06 * cos(tile.phaseA.w);
+    float secondStartReach = 0.25 + 0.06 * sin(tile.phaseB.x);
+    float secondEndReach = 0.25 + 0.06 * cos(tile.phaseB.y);
+    float boundaryInk
+        = boundaryInkStroke(tile.edges.x, parameter.x, parameter.y)
+        + boundaryInkStroke(tile.edges.y, parameter.x, 1.0 - parameter.y)
+        + boundaryInkStroke(tile.edges.z, parameter.y, parameter.x)
+        + boundaryInkStroke(tile.edges.w, parameter.y, 1.0 - parameter.x);
+    float interiorInk = boundaryWindow(parameter) * (
+        cubicInk(
+            parameter,
+            endpoints[pairs[0]],
+            endpoints[pairs[0]] + firstStartReach * inwardDirections[pairs[0]],
+            endpoints[pairs[1]] + firstEndReach * inwardDirections[pairs[1]],
+            endpoints[pairs[1]],
+            widths[pairs[0]],
+            widths[pairs[1]])
+        + cubicInk(
+            parameter,
+            endpoints[pairs[2]],
+            endpoints[pairs[2]] + secondStartReach * inwardDirections[pairs[2]],
+            endpoints[pairs[3]] + secondEndReach * inwardDirections[pairs[3]],
+            endpoints[pairs[3]],
+            widths[pairs[2]],
+            widths[pairs[3]]));
+    float coverage = smoothUnit(clamp(boundaryInk + interiorInk, 0.0, 1.0));
+    return 0.58 - 1.48 * coverage;
+}
+
 float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
     float worldPhase = tau * (
         u_worldSettings.z * world.x + u_worldSettings.w * world.y);
@@ -309,11 +436,16 @@ float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
         + u_worldSettings.y * vec2(sin(worldPhase), cos(secondaryWorldPhase));
     float base = u_generatorWeights.x * evaluateFourier(warped)
         + u_generatorWeights.y * evaluateNoise(warped);
+    float edgeStructure = 0.0;
+    if (u_styleStructureSettings.z != 0.0) {
+        edgeStructure = u_styleStructureSettings.z * edgeConnectedInk(parameter, tile);
+    }
     float value = base
         + u_generatorWeights.z * window * tileVariation(parameter, tile)
         + u_worldSettings.x * sin(worldPhase)
         + u_worldDetailAmplitude * worldDetail
-        + u_styleStructureSettings.x * worldGrain;
+        + u_styleStructureSettings.x * worldGrain
+        + edgeStructure;
     // 标量 profile 只重排连续场的层级，不改变 Wang 边界的取值一致性。
     float bounded = clamp(value, -1.0, 1.0);
     if (u_scalarProfile == 1) {

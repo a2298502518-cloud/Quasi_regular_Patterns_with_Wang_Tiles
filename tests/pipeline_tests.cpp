@@ -149,6 +149,41 @@ void testScalarProfilesPreserveBoundaryContinuity() {
     }
 }
 
+void testEdgeConnectedInkMatchesAcrossSharedEdges() {
+    auto settings = HybridGeneratorSettings{};
+    settings.fourierWeight = 0.0;
+    settings.noiseWeight = 0.0;
+    settings.tileVariationAmplitude = 0.0;
+    settings.tileDomainWarpAmplitude = 0.0;
+    settings.worldModulationAmplitude = 0.0;
+    settings.worldDomainWarpAmplitude = 0.0;
+    settings.worldDetailAmplitude = 0.0;
+    settings.worldGrainAmplitude = 0.0;
+    settings.edgeStructureAmplitude = 1.0;
+    const auto generator = createGenerator(settings);
+
+    for (int index = 0; index <= 400; ++index) {
+        const double t = static_cast<double>(index) / 400.0;
+        const Vec2 verticalWorld{9.0, 4.0 + t};
+        requireNear(
+            generator.evaluate(GeneratorInput{
+                Vec2{1.0, t}, verticalWorld, 17, {1, 2, 3, 7}}),
+            generator.evaluate(GeneratorInput{
+                Vec2{0.0, t}, verticalWorld, 91, {4, 5, 7, 6}}),
+            2.0e-14,
+            "edge ink vertical seam");
+
+        const Vec2 horizontalWorld{6.0 + t, 8.0};
+        requireNear(
+            generator.evaluate(GeneratorInput{
+                Vec2{t, 1.0}, horizontalWorld, 23, {8, 11, 9, 10}}),
+            generator.evaluate(GeneratorInput{
+                Vec2{t, 0.0}, horizontalWorld, 47, {11, 12, 13, 14}}),
+            2.0e-14,
+            "edge ink horizontal seam");
+    }
+}
+
 void testGradientPalettesStayFiniteAndBounded() {
     const std::vector<qrp::color::GradientPalette> palettes{
         qrp::color::GradientPalette::createMidnightGold(),
@@ -374,11 +409,12 @@ void testProjectMetadataIsCompleteAndStable() {
     require(json.find("\"width\": 2880") != std::string::npos, "metadata needs width");
     require(json.find("\"interpolation\": \"Oklab\"") != std::string::npos, "metadata needs color semantics");
     require(json.find("\"seedHex\": \"0x") != std::string::npos, "metadata needs an exact seed");
-    require(json.find("\"model\": \"hybrid_torus_v3\"") != std::string::npos, "metadata needs generator semantics");
+    require(json.find("\"model\": \"hybrid_torus_v4\"") != std::string::npos, "metadata needs generator semantics");
     require(json.find("\"scalarProfile\": \"natural\"") != std::string::npos, "metadata needs scalar profile");
     require(json.find("\"worldDetailAmplitude\"") != std::string::npos, "metadata needs world detail");
     require(json.find("\"worldGrainAmplitude\"") != std::string::npos, "metadata needs world grain");
     require(json.find("\"cellularScale\"") != std::string::npos, "metadata needs cellular scale");
+    require(json.find("\"edgeStructureAmplitude\"") != std::string::npos, "metadata needs edge structure");
     require(json.find("\"posterizeLevels\"") != std::string::npos, "metadata needs posterization");
     require(json.find("\"fourierModes\"") != std::string::npos, "metadata needs Fourier basis data");
     require(json.find("\"periodicNoise\"") != std::string::npos, "metadata needs noise basis data");
@@ -398,11 +434,15 @@ void testStylePresetsChangeStructureNotOnlyColor() {
         screenprint.palette.tone().posterizeLevels == 4,
         "graphic screenprint must use a finite four-color treatment");
     require(
-        ink.generator.noiseWeight > 10.0 * ink.generator.fourierWeight,
-        "ink wash must be structurally noise-dominant");
+        ink.generator.edgeStructureAmplitude
+            > 5.0 * (ink.generator.noiseWeight + ink.generator.fourierWeight),
+        "ink wash must be structurally Wang-edge-dominant");
     require(
         ink.generator.worldGrainAmplitude > 0.0,
         "ink wash must carry cross-tile world grain");
+    require(
+        ink.generator.edgeStructureAmplitude > 0.0,
+        "ink wash must expose its Wang-edge structure");
     require(
         cells.generator.scalarProfile == qrp::generators::ScalarProfile::Cells,
         "cellular camo must use the cellular scalar profile");
@@ -420,6 +460,7 @@ int main() {
         {"torus generator periodicity", testTorusGeneratorsArePeriodic},
         {"tile variation boundary", testTileVariationVanishesOnBoundary},
         {"scalar profile boundaries", testScalarProfilesPreserveBoundaryContinuity},
+        {"edge ink shared boundaries", testEdgeConnectedInkMatchesAcrossSharedEdges},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
         {"posterized palette plateaus", testPosterizedPaletteUsesStablePlateaus},

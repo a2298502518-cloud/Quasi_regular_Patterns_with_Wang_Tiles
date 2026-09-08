@@ -503,6 +503,7 @@ struct IntermediateComparisonMetrics {
                 inverse.parameter,
                 qrp::math::Vec2{worldX, worldY},
                 tile.seed,
+                {tile.south, tile.north, tile.west, tile.east},
             });
             metrics.maximumScalarDifference = std::max(
                 metrics.maximumScalarDifference,

@@ -34,6 +34,9 @@ namespace {
         && std::isfinite(settings.cellularScale)
         && settings.cellularScale > 0.0
         && settings.cellularScale <= 4.0
+        && std::isfinite(settings.edgeStructureAmplitude)
+        && settings.edgeStructureAmplitude >= 0.0
+        && settings.edgeStructureAmplitude <= 2.0
         && generators::isValid(settings.scalarProfile);
 }
 

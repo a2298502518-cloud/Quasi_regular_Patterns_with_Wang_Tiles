@@ -51,6 +51,88 @@ namespace {
     return static_cast<double>(value >> 8U) / 16777216.0;
 }
 
+[[nodiscard]] double softBump(
+    const double coordinate,
+    const double center,
+    const double halfWidth) noexcept {
+    const double distance = std::abs(coordinate - center) / halfWidth;
+    const double amount = std::clamp(1.0 - distance, 0.0, 1.0);
+    return amount * amount * (3.0 - 2.0 * amount);
+}
+
+[[nodiscard]] double edgeInkCenter(const std::uint32_t color) noexcept {
+    const int key = static_cast<int>(color);
+    return 0.18 + 0.64 * unitFloat24(hashCell(key, 0, 0x6d2b79f5U));
+}
+
+[[nodiscard]] double edgeInkWidth(const std::uint32_t color) noexcept {
+    const int key = static_cast<int>(color);
+    return 0.038 + 0.018 * unitFloat24(hashCell(key, 0, 0x1b873593U));
+}
+
+[[nodiscard]] double smoothUnit(const double value) noexcept {
+    const double amount = std::clamp(value, 0.0, 1.0);
+    return amount * amount * (3.0 - 2.0 * amount);
+}
+
+[[nodiscard]] double segmentInk(
+    const math::Vec2 point,
+    const math::Vec2 first,
+    const math::Vec2 second,
+    const double firstWidth,
+    const double secondWidth) noexcept {
+    const double dx = second.x - first.x;
+    const double dy = second.y - first.y;
+    const double lengthSquared = dx * dx + dy * dy;
+    const double amount = lengthSquared > 0.0
+        ? std::clamp(
+            ((point.x - first.x) * dx + (point.y - first.y) * dy) / lengthSquared,
+            0.0,
+            1.0)
+        : 0.0;
+    const double offsetX = point.x - (first.x + amount * dx);
+    const double offsetY = point.y - (first.y + amount * dy);
+    const double width = firstWidth + amount * (secondWidth - firstWidth);
+    return softBump(
+        std::sqrt(offsetX * offsetX + offsetY * offsetY),
+        0.0,
+        width);
+}
+
+[[nodiscard]] double cubicInk(
+    const math::Vec2 point,
+    const math::Vec2 start,
+    const math::Vec2 firstControl,
+    const math::Vec2 secondControl,
+    const math::Vec2 end,
+    const double startWidth,
+    const double endWidth) noexcept {
+    double coverage = 0.0;
+    math::Vec2 previous = start;
+    double previousWidth = startWidth;
+    for (int segment = 1; segment <= 16; ++segment) {
+        const double amount = static_cast<double>(segment) / 16.0;
+        const double inverse = 1.0 - amount;
+        const math::Vec2 current{
+            inverse * inverse * inverse * start.x
+                + 3.0 * inverse * inverse * amount * firstControl.x
+                + 3.0 * inverse * amount * amount * secondControl.x
+                + amount * amount * amount * end.x,
+            inverse * inverse * inverse * start.y
+                + 3.0 * inverse * inverse * amount * firstControl.y
+                + 3.0 * inverse * amount * amount * secondControl.y
+                + amount * amount * amount * end.y,
+        };
+        const double currentWidth = startWidth + amount * (endWidth - startWidth);
+        coverage = std::max(
+            coverage,
+            segmentInk(point, previous, current, previousWidth, currentWidth));
+        previous = current;
+        previousWidth = currentWidth;
+    }
+    return coverage;
+}
+
 } // namespace
 
 bool isValid(const ScalarProfile profile) noexcept {
@@ -88,6 +170,9 @@ HybridTorusGenerator::HybridTorusGenerator(
         || !std::isfinite(settings_.cellularScale)
         || settings_.cellularScale <= 0.0
         || settings_.cellularScale > 4.0
+        || !std::isfinite(settings_.edgeStructureAmplitude)
+        || settings_.edgeStructureAmplitude < 0.0
+        || settings_.edgeStructureAmplitude > 2.0
         || !isValid(settings_.scalarProfile)) {
         throw std::invalid_argument("Hybrid generator settings must be finite.");
     }
@@ -168,6 +253,11 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             / 1.75;
     }
     const TileVariationDescriptor tile = describeTile(input.tileSeed);
+    double edgeStructure = 0.0;
+    if (settings_.edgeStructureAmplitude != 0.0) {
+        edgeStructure = settings_.edgeStructureAmplitude
+            * edgeConnectedInk(input.parameter, input.edgeColors, tile);
+    }
     const math::Vec2 tileOffset = tileDomainOffset(input.parameter, tile);
     const double window = boundaryWindow(input.parameter);
     const math::Vec2 warpedParameter{
@@ -184,7 +274,8 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             * tileVariation(input.parameter, tile)
         + settings_.worldModulationAmplitude * std::sin(worldPhase)
         + settings_.worldDetailAmplitude * worldDetail
-        + settings_.worldGrainAmplitude * worldGrain;
+        + settings_.worldGrainAmplitude * worldGrain
+        + edgeStructure;
     if (settings_.scalarProfile == ScalarProfile::Cells) {
         return std::clamp(
             cellularField(input.world, settings_.cellularScale)
@@ -193,6 +284,87 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             1.0);
     }
     return applyScalarProfile(value, settings_.scalarProfile);
+}
+
+double HybridTorusGenerator::edgeConnectedInk(
+    const math::Vec2 parameter,
+    const std::array<std::uint32_t, 4>& edgeColors,
+    const TileVariationDescriptor& descriptor) noexcept {
+    constexpr std::size_t south = 0;
+    constexpr std::size_t north = 1;
+    constexpr std::size_t west = 2;
+    constexpr std::size_t east = 3;
+    const std::array<math::Vec2, 4> endpoints{{
+        {edgeInkCenter(edgeColors[south]), 0.0},
+        {edgeInkCenter(edgeColors[north]), 1.0},
+        {0.0, edgeInkCenter(edgeColors[west])},
+        {1.0, edgeInkCenter(edgeColors[east])},
+    }};
+    const std::array<math::Vec2, 4> inwardDirections{{
+        {0.0, 1.0},
+        {0.0, -1.0},
+        {1.0, 0.0},
+        {-1.0, 0.0},
+    }};
+    const std::array<double, 4> widths{{
+        edgeInkWidth(edgeColors[south]),
+        edgeInkWidth(edgeColors[north]),
+        edgeInkWidth(edgeColors[west]),
+        edgeInkWidth(edgeColors[east]),
+    }};
+    std::array<std::size_t, 4> pairs{};
+    switch ((descriptor.frequencyU[0] + descriptor.frequencyV[1]) % 3) {
+    case 0: pairs = {south, north, west, east}; break;
+    case 1: pairs = {south, west, north, east}; break;
+    default: pairs = {south, east, north, west}; break;
+    }
+    const auto controlPoint = [&endpoints, &inwardDirections](
+                                  const std::size_t endpoint,
+                                  const double reach) noexcept {
+        return math::Vec2{
+            endpoints[endpoint].x + reach * inwardDirections[endpoint].x,
+            endpoints[endpoint].y + reach * inwardDirections[endpoint].y,
+        };
+    };
+    const auto boundaryStroke = [](const std::uint32_t color,
+                                   const double tangent,
+                                   const double inward) noexcept {
+        const double reach = 1.0 - smoothUnit(inward / 0.20);
+        return reach * softBump(
+            tangent,
+            edgeInkCenter(color),
+            edgeInkWidth(color));
+    };
+    const double firstStartReach = 0.25 + 0.06 * std::sin(descriptor.phase[0]);
+    const double firstEndReach = 0.25 + 0.06 * std::cos(descriptor.phase[1]);
+    const double secondStartReach = 0.25 + 0.06 * std::sin(descriptor.phase[2]);
+    const double secondEndReach = 0.25 + 0.06 * std::cos(descriptor.phase[3]);
+    const double boundaryInk
+        = boundaryStroke(edgeColors[south], parameter.x, parameter.y)
+        + boundaryStroke(edgeColors[north], parameter.x, 1.0 - parameter.y)
+        + boundaryStroke(edgeColors[west], parameter.y, parameter.x)
+        + boundaryStroke(edgeColors[east], parameter.y, 1.0 - parameter.x);
+    const double interiorInk = boundaryWindow(parameter) * (
+        cubicInk(
+            parameter,
+            endpoints[pairs[0]],
+            controlPoint(pairs[0], firstStartReach),
+            controlPoint(pairs[1], firstEndReach),
+            endpoints[pairs[1]],
+            widths[pairs[0]],
+            widths[pairs[1]])
+        + cubicInk(
+            parameter,
+            endpoints[pairs[2]],
+            controlPoint(pairs[2], secondStartReach),
+            controlPoint(pairs[3], secondEndReach),
+            endpoints[pairs[3]],
+            widths[pairs[2]],
+            widths[pairs[3]]));
+    const double coverage = smoothUnit(
+        std::clamp(boundaryInk + interiorInk, 0.0, 1.0));
+    // 共享边颜色决定入口与线宽；端点法向固定，跨 tile 后路径保持顺滑。
+    return 0.58 - 1.48 * coverage;
 }
 
 double HybridTorusGenerator::applyScalarProfile(

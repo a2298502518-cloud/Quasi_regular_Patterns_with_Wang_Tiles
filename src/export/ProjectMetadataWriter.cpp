@@ -83,7 +83,7 @@ std::string serializeProjectMetadata(
     const auto& noiseSettings = noise.settings();
     stream << "  ],\n"
            << "  \"generator\": {\n"
-           << "    \"model\": \"hybrid_torus_v3\",\n"
+           << "    \"model\": \"hybrid_torus_v4\",\n"
            << "    \"scalarProfile\": \""
            << generators::scalarProfileName(generator.scalarProfile) << "\",\n"
            << "    \"fourierWeight\": " << generator.fourierWeight << ",\n"
@@ -97,6 +97,8 @@ std::string serializeProjectMetadata(
            << "    \"worldDetailAmplitude\": " << generator.worldDetailAmplitude << ",\n"
            << "    \"worldGrainAmplitude\": " << generator.worldGrainAmplitude << ",\n"
            << "    \"cellularScale\": " << generator.cellularScale << ",\n"
+           << "    \"edgeStructureAmplitude\": "
+           << generator.edgeStructureAmplitude << ",\n"
            << "    \"fourierModes\": [\n";
     for (std::size_t index = 0; index < fourier.modes().size(); ++index) {
         const auto& mode = fourier.modes()[index];

@@ -264,10 +264,11 @@ void GpuPatternRenderer::uploadScene(
     glUniform1f(
         uniformLocation("u_worldDetailAmplitude"),
         narrow(settings.worldDetailAmplitude));
-    glUniform2f(
+    glUniform3f(
         uniformLocation("u_styleStructureSettings"),
         narrow(settings.worldGrainAmplitude),
-        narrow(settings.cellularScale));
+        narrow(settings.cellularScale),
+        narrow(settings.edgeStructureAmplitude));
     glUniform2i(
         uniformLocation("u_gridSize"),
         static_cast<GLint>(grid.width()),

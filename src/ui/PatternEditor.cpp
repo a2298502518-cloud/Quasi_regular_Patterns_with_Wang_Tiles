@@ -68,6 +68,7 @@ void drawGenerator(generators::HybridGeneratorSettings& settings) {
     sliderDouble("World frequency Y", settings.worldFrequencyY, -0.5, 0.5, "%.4f");
     sliderDouble("World detail", settings.worldDetailAmplitude, 0.0, 1.5);
     sliderDouble("World grain", settings.worldGrainAmplitude, 0.0, 0.6);
+    sliderDouble("Edge-connected structure", settings.edgeStructureAmplitude, 0.0, 2.0);
     if (settings.scalarProfile == generators::ScalarProfile::Cells) {
         sliderDouble("Cellular scale", settings.cellularScale, 0.15, 2.0);
     }
