@@ -166,6 +166,39 @@ GradientPalette GradientPalette::createAurora() {
     }, ToneSettings{0.0, 1.95, 7.0, 0.12});
 }
 
+GradientPalette GradientPalette::createGraphicPrimary() {
+    return GradientPalette({
+        {0.00, linearRgbFromSrgb8(10, 20, 38)},
+        {0.30, linearRgbFromSrgb8(24, 55, 96)},
+        {0.43, linearRgbFromSrgb8(235, 229, 204)},
+        {0.58, linearRgbFromSrgb8(250, 244, 224)},
+        {0.70, linearRgbFromSrgb8(218, 62, 45)},
+        {1.00, linearRgbFromSrgb8(241, 170, 35)},
+    }, ToneSettings{0.0, 2.35, 0.0, 0.0});
+}
+
+GradientPalette GradientPalette::createInkWash() {
+    return GradientPalette({
+        {0.00, linearRgbFromSrgb8(9, 15, 20)},
+        {0.22, linearRgbFromSrgb8(31, 43, 50)},
+        {0.46, linearRgbFromSrgb8(86, 101, 105)},
+        {0.70, linearRgbFromSrgb8(174, 177, 167)},
+        {0.88, linearRgbFromSrgb8(224, 219, 203)},
+        {1.00, linearRgbFromSrgb8(247, 242, 226)},
+    }, ToneSettings{0.0, 1.25, 0.0, 0.0});
+}
+
+GradientPalette GradientPalette::createFieldCamo() {
+    return GradientPalette({
+        {0.00, linearRgbFromSrgb8(18, 38, 24)},
+        {0.24, linearRgbFromSrgb8(48, 78, 52)},
+        {0.43, linearRgbFromSrgb8(101, 107, 78)},
+        {0.61, linearRgbFromSrgb8(181, 164, 108)},
+        {0.78, linearRgbFromSrgb8(211, 181, 126)},
+        {1.00, linearRgbFromSrgb8(82, 54, 36)},
+    }, ToneSettings{0.02, 2.75, 3.0, 0.08});
+}
+
 const std::vector<ColorStop>& GradientPalette::stops() const noexcept {
     return stops_;
 }

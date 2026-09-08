@@ -35,6 +35,21 @@ namespace {
 
 } // namespace
 
+bool isValid(const ScalarProfile profile) noexcept {
+    return profile == ScalarProfile::Natural
+        || profile == ScalarProfile::Ridges
+        || profile == ScalarProfile::Cells;
+}
+
+const char* scalarProfileName(const ScalarProfile profile) noexcept {
+    switch (profile) {
+    case ScalarProfile::Natural: return "natural";
+    case ScalarProfile::Ridges: return "ridges";
+    case ScalarProfile::Cells: return "cells";
+    }
+    return "invalid";
+}
+
 HybridTorusGenerator::HybridTorusGenerator(
     TorusFourier fourier,
     PeriodicGradientNoise noise,
@@ -49,7 +64,9 @@ HybridTorusGenerator::HybridTorusGenerator(
         || !std::isfinite(settings_.worldModulationAmplitude)
         || !std::isfinite(settings_.worldDomainWarpAmplitude)
         || !std::isfinite(settings_.worldFrequencyX)
-        || !std::isfinite(settings_.worldFrequencyY)) {
+        || !std::isfinite(settings_.worldFrequencyY)
+        || !std::isfinite(settings_.worldDetailAmplitude)
+        || !isValid(settings_.scalarProfile)) {
         throw std::invalid_argument("Hybrid generator settings must be finite.");
     }
 }
@@ -100,6 +117,26 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
     const double secondaryWorldPhase = tau * (
         -0.73 * settings_.worldFrequencyY * input.world.x
         + 0.91 * settings_.worldFrequencyX * input.world.y + 0.17);
+    double worldDetail = 0.0;
+    if (settings_.worldDetailAmplitude != 0.0) {
+        const double tertiaryWorldPhase = tau * (
+            (1.31 * settings_.worldFrequencyX + 0.47 * settings_.worldFrequencyY)
+                * input.world.x
+            + (-0.59 * settings_.worldFrequencyX + 1.17 * settings_.worldFrequencyY)
+                * input.world.y
+            + 0.43);
+        const double quaternaryWorldPhase = tau * (
+            (-1.73 * settings_.worldFrequencyX + 0.29 * settings_.worldFrequencyY)
+                * input.world.x
+            + (0.41 * settings_.worldFrequencyX + 1.53 * settings_.worldFrequencyY)
+                * input.world.y
+            + 0.71);
+        worldDetail = (
+            std::sin(worldPhase)
+            + 0.63 * std::cos(secondaryWorldPhase)
+            + 0.41 * std::sin(tertiaryWorldPhase)
+            + 0.28 * std::cos(quaternaryWorldPhase)) / 2.32;
+    }
     const TileVariationDescriptor tile = describeTile(input.tileSeed);
     const math::Vec2 tileOffset = tileDomainOffset(input.parameter, tile);
     const double window = boundaryWindow(input.parameter);
@@ -111,11 +148,28 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             + settings_.tileDomainWarpAmplitude * window * tileOffset.y
             + settings_.worldDomainWarpAmplitude * std::cos(secondaryWorldPhase),
     };
-    return evaluateBase(warpedParameter)
+    const double value = evaluateBase(warpedParameter)
         + settings_.tileVariationAmplitude
             * window
             * tileVariation(input.parameter, tile)
-        + settings_.worldModulationAmplitude * std::sin(worldPhase);
+        + settings_.worldModulationAmplitude * std::sin(worldPhase)
+        + settings_.worldDetailAmplitude * worldDetail;
+    return applyScalarProfile(value, settings_.scalarProfile);
+}
+
+double HybridTorusGenerator::applyScalarProfile(
+    const double value,
+    const ScalarProfile profile) noexcept {
+    const double bounded = std::clamp(value, -1.0, 1.0);
+    switch (profile) {
+    case ScalarProfile::Ridges:
+        return 1.0 - 2.0 * std::abs(bounded);
+    case ScalarProfile::Cells:
+        return std::cos(std::numbers::pi_v<double> * bounded);
+    case ScalarProfile::Natural:
+        return value;
+    }
+    return value;
 }
 
 math::Vec2 HybridTorusGenerator::tileDomainOffset(

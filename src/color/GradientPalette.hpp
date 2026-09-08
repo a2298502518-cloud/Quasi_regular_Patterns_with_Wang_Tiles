@@ -36,6 +36,9 @@ public:
     [[nodiscard]] static GradientPalette createMidnightGold();
     [[nodiscard]] static GradientPalette createMineral();
     [[nodiscard]] static GradientPalette createAurora();
+    [[nodiscard]] static GradientPalette createGraphicPrimary();
+    [[nodiscard]] static GradientPalette createInkWash();
+    [[nodiscard]] static GradientPalette createFieldCamo();
 
     [[nodiscard]] const std::vector<ColorStop>& stops() const noexcept;
     [[nodiscard]] const ToneSettings& tone() const noexcept;

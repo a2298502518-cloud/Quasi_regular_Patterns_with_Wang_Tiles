@@ -254,6 +254,12 @@ void GpuPatternRenderer::uploadScene(
         narrow(settings.worldDomainWarpAmplitude),
         narrow(settings.worldFrequencyX),
         narrow(settings.worldFrequencyY));
+    glUniform1i(
+        uniformLocation("u_scalarProfile"),
+        static_cast<GLint>(settings.scalarProfile));
+    glUniform1f(
+        uniformLocation("u_worldDetailAmplitude"),
+        narrow(settings.worldDetailAmplitude));
     glUniform2i(
         uniformLocation("u_gridSize"),
         static_cast<GLint>(grid.width()),

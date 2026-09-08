@@ -127,11 +127,11 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
             options.validate = true;
         } else if (argument == "--preset") {
             if (index + 1 >= argc) {
-                throw std::invalid_argument("--preset requires an index from 1 to 5.");
+                throw std::invalid_argument("--preset requires a positive preset index.");
             }
             const int humanIndex = std::stoi(argv[++index]);
-            if (humanIndex < 1 || humanIndex > 5) {
-                throw std::out_of_range("Preset index must be from 1 to 5.");
+            if (humanIndex < 1) {
+                throw std::out_of_range("Preset index must be positive.");
             }
             options.presetIndex = static_cast<std::size_t>(humanIndex - 1);
         } else if (argument == "--debug") {
@@ -299,7 +299,7 @@ void keyCallback(GLFWwindow* window, const int key, int, const int action, int) 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     } else if (qrp::ui::wantsKeyboardInput()) {
         return;
-    } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5) {
+    } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_8) {
         state.requestedPreset = static_cast<std::size_t>(key - GLFW_KEY_1);
     } else if (key == GLFW_KEY_D) {
         const int next = (static_cast<int>(state.debugView) + 1) % 4;

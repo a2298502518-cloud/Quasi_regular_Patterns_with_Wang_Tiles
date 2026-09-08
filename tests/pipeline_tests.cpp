@@ -124,11 +124,38 @@ void testTileVariationVanishesOnBoundary() {
     }
 }
 
+void testScalarProfilesPreserveBoundaryContinuity() {
+    constexpr std::array profiles{
+        qrp::generators::ScalarProfile::Natural,
+        qrp::generators::ScalarProfile::Ridges,
+        qrp::generators::ScalarProfile::Cells,
+    };
+    for (const auto profile : profiles) {
+        auto settings = HybridGeneratorSettings{};
+        settings.scalarProfile = profile;
+        settings.worldDetailAmplitude = 0.9;
+        const auto generator = createGenerator(settings);
+        for (int index = 0; index <= 256; ++index) {
+            const double t = static_cast<double>(index) / 256.0;
+            const Vec2 world{6.0 + t, 9.0};
+            requireNear(
+                generator.evaluate(GeneratorInput{Vec2{t, 0.0}, world, 17}),
+                generator.evaluate(GeneratorInput{Vec2{t, 1.0}, world, 91}),
+                2.0e-14,
+                std::string("profile boundary ")
+                    + qrp::generators::scalarProfileName(profile));
+        }
+    }
+}
+
 void testGradientPalettesStayFiniteAndBounded() {
     const std::vector<qrp::color::GradientPalette> palettes{
         qrp::color::GradientPalette::createMidnightGold(),
         qrp::color::GradientPalette::createMineral(),
         qrp::color::GradientPalette::createAurora(),
+        qrp::color::GradientPalette::createGraphicPrimary(),
+        qrp::color::GradientPalette::createInkWash(),
+        qrp::color::GradientPalette::createFieldCamo(),
     };
     for (const auto& palette : palettes) {
         for (int index = -1000; index <= 1000; ++index) {
@@ -247,6 +274,12 @@ void testProjectDraftCommitTransaction() {
 
     project.resetDraft();
     require(!project.isDirty(), "Reset Draft must restore committed parameters");
+
+    project.draft().generator.scalarProfile
+        = static_cast<qrp::generators::ScalarProfile>(99);
+    const auto invalidProfile = project.applyDraft();
+    require(!invalidProfile.applied, "unknown scalar profiles must be rejected");
+    require(project.committed() == committed, "invalid profiles must preserve committed state");
 }
 
 void testMaterialSettingsCommitAtomically() {
@@ -309,10 +342,34 @@ void testProjectMetadataIsCompleteAndStable() {
     require(json.find("\"width\": 2880") != std::string::npos, "metadata needs width");
     require(json.find("\"interpolation\": \"Oklab\"") != std::string::npos, "metadata needs color semantics");
     require(json.find("\"seedHex\": \"0x") != std::string::npos, "metadata needs an exact seed");
-    require(json.find("\"model\": \"hybrid_torus_v1\"") != std::string::npos, "metadata needs generator semantics");
+    require(json.find("\"model\": \"hybrid_torus_v2\"") != std::string::npos, "metadata needs generator semantics");
+    require(json.find("\"scalarProfile\": \"natural\"") != std::string::npos, "metadata needs scalar profile");
+    require(json.find("\"worldDetailAmplitude\"") != std::string::npos, "metadata needs world detail");
     require(json.find("\"fourierModes\"") != std::string::npos, "metadata needs Fourier basis data");
     require(json.find("\"periodicNoise\"") != std::string::npos, "metadata needs noise basis data");
     require(json.find("\"material\"") != std::string::npos, "metadata needs material settings");
+}
+
+void testStylePresetsChangeStructureNotOnlyColor() {
+    const auto presets = qrp::presets::createBaselinePresets();
+    require(presets.size() == 8, "the preset suite must contain eight baselines");
+    const auto& screenprint = presets.at(5);
+    const auto& ink = presets.at(6);
+    const auto& cells = presets.at(7);
+    require(
+        screenprint.generator.scalarProfile == qrp::generators::ScalarProfile::Ridges,
+        "graphic screenprint must use the ridged scalar profile");
+    require(
+        ink.generator.noiseWeight > 10.0 * ink.generator.fourierWeight,
+        "ink wash must be structurally noise-dominant");
+    require(
+        cells.generator.scalarProfile == qrp::generators::ScalarProfile::Cells,
+        "cellular camo must use the cellular scalar profile");
+    require(
+        screenprint.material.contourStrength == 0.0
+            && ink.material.contourStrength == 0.0
+            && cells.material.contourStrength == 0.0,
+        "new styles must not inherit the original contour language");
 }
 
 } // namespace
@@ -321,6 +378,7 @@ int main() {
     const std::vector<TestCase> tests{
         {"torus generator periodicity", testTorusGeneratorsArePeriodic},
         {"tile variation boundary", testTileVariationVanishesOnBoundary},
+        {"scalar profile boundaries", testScalarProfilesPreserveBoundaryContinuity},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
         {"measured seams", testMeasuredSeams},
@@ -329,6 +387,7 @@ int main() {
         {"material settings transaction", testMaterialSettingsCommitAtomically},
         {"PNG sRGB metadata", testPngEncodingCarriesSrgbMetadata},
         {"project export metadata", testProjectMetadataIsCompleteAndStable},
+        {"structurally distinct style presets", testStylePresetsChangeStructureNotOnlyColor},
     };
 
     int failures = 0;

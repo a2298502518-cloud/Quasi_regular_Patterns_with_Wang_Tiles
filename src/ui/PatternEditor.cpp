@@ -53,6 +53,11 @@ void sliderDouble(
 }
 
 void drawGenerator(generators::HybridGeneratorSettings& settings) {
+    int profile = static_cast<int>(settings.scalarProfile);
+    constexpr const char* profiles[] = {"Natural field", "Ridges / ribbons", "Cellular rings"};
+    if (ImGui::Combo("Scalar profile", &profile, profiles, 3)) {
+        settings.scalarProfile = static_cast<generators::ScalarProfile>(profile);
+    }
     sliderDouble("Fourier weight", settings.fourierWeight, 0.0, 1.5);
     sliderDouble("Noise weight", settings.noiseWeight, 0.0, 1.5);
     sliderDouble("Tile variation", settings.tileVariationAmplitude, 0.0, 0.8);
@@ -61,6 +66,7 @@ void drawGenerator(generators::HybridGeneratorSettings& settings) {
     sliderDouble("World domain warp", settings.worldDomainWarpAmplitude, 0.0, 1.25);
     sliderDouble("World frequency X", settings.worldFrequencyX, -0.5, 0.5, "%.4f");
     sliderDouble("World frequency Y", settings.worldFrequencyY, -0.5, 0.5, "%.4f");
+    sliderDouble("World detail", settings.worldDetailAmplitude, 0.0, 1.5);
 }
 
 void drawEdgePalette(std::vector<math::EdgeParameters>& edges) {

@@ -41,6 +41,8 @@ uniform vec4 u_materialSettings;
 
 uniform vec4 u_generatorWeights;
 uniform vec4 u_worldSettings;
+uniform int u_scalarProfile;
+uniform float u_worldDetailAmplitude;
 
 const float pi = 3.14159265358979323846;
 const float tau = 6.28318530717958647692;
@@ -229,15 +231,41 @@ float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
     float secondaryWorldPhase = tau * (
         -0.73 * u_worldSettings.w * world.x
         + 0.91 * u_worldSettings.z * world.y + 0.17);
+    float worldDetail = 0.0;
+    if (u_worldDetailAmplitude != 0.0) {
+        float tertiaryWorldPhase = tau * (
+            (1.31 * u_worldSettings.z + 0.47 * u_worldSettings.w) * world.x
+            + (-0.59 * u_worldSettings.z + 1.17 * u_worldSettings.w) * world.y
+            + 0.43);
+        float quaternaryWorldPhase = tau * (
+            (-1.73 * u_worldSettings.z + 0.29 * u_worldSettings.w) * world.x
+            + (0.41 * u_worldSettings.z + 1.53 * u_worldSettings.w) * world.y
+            + 0.71);
+        worldDetail = (
+            sin(worldPhase)
+            + 0.63 * cos(secondaryWorldPhase)
+            + 0.41 * sin(tertiaryWorldPhase)
+            + 0.28 * cos(quaternaryWorldPhase)) / 2.32;
+    }
     float window = boundaryWindow(parameter);
     vec2 warped = parameter
         + u_generatorWeights.w * window * tileDomainOffset(parameter, tile)
         + u_worldSettings.y * vec2(sin(worldPhase), cos(secondaryWorldPhase));
     float base = u_generatorWeights.x * evaluateFourier(warped)
         + u_generatorWeights.y * evaluateNoise(warped);
-    return base
+    float value = base
         + u_generatorWeights.z * window * tileVariation(parameter, tile)
-        + u_worldSettings.x * sin(worldPhase);
+        + u_worldSettings.x * sin(worldPhase)
+        + u_worldDetailAmplitude * worldDetail;
+    // 标量 profile 只重排连续场的层级，不改变 Wang 边界的取值一致性。
+    float bounded = clamp(value, -1.0, 1.0);
+    if (u_scalarProfile == 1) {
+        return 1.0 - 2.0 * abs(bounded);
+    }
+    if (u_scalarProfile == 2) {
+        return cos(pi * bounded);
+    }
+    return value;
 }
 
 float toneCoordinate(float scalar) {
