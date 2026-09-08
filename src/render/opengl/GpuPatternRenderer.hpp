@@ -5,6 +5,7 @@
 #include "generators/HybridTorusGenerator.hpp"
 #include "model/EdgePalette.hpp"
 #include "model/WangGrid.hpp"
+#include "render/Image.hpp"
 #include "render/opengl/ShaderProgram.hpp"
 
 #include <filesystem>
@@ -53,6 +54,13 @@ public:
         int framebufferHeight,
         const Camera2D& camera,
         DebugView debugView,
+        bool enableMaterial = true) const;
+    // 离屏导出复用 draw()；这里仅负责目标纹理和 OpenGL/图像坐标系转换。
+    [[nodiscard]] render::Image renderImage(
+        int width,
+        int height,
+        const Camera2D& camera,
+        DebugView debugView = DebugView::Pattern,
         bool enableMaterial = true) const;
     [[nodiscard]] GpuValidationBuffers renderValidationBuffers(
         int width,

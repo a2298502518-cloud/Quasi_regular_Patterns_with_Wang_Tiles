@@ -6,7 +6,7 @@ domain-invariant Coons warp 和环面连续生成器为核心，在可验证无�
 
 ## 当前状态
 
-CPU 数学核心、CPU 基准渲染、GPU 实时渲染和交互视觉系统已经完成。当前仓库包含：
+CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和可复现导出已经完成。当前仓库包含：
 
 - 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
 - [实现计划](./docs/implementation-plan.md)
@@ -15,6 +15,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染和交互视觉系统已�
 - [CPU 基准与复现记录](./docs/cpu-baselines.md)
 - [GPU 基准与一致性记录](./docs/gpu-baselines.md)
 - [交互编辑器与提交语义](./docs/interactive-editor.md)
+- [PNG 与参数导出](./docs/export.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 - 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
 - 单瓦片、2 x 2 与三套 10 x 10 固定种子基准，以及独立接缝误差热图
@@ -22,6 +23,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染和交互视觉系统已�
 - 可编辑 Wang 网格、边函数、生成器和色带的 Dear ImGui 面板
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
+- 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
 周期条件的论证，不直接作为代码契约。
@@ -69,6 +71,16 @@ ctest --test-dir build -C Release --output-on-failure
 - `D`：切换图案、Jacobian、Newton 残差和瓦片边界视图。
 - `R`：重置相机；`Esc`：退出。
 - 面板预设只载入草稿；`Apply validated draft` 校验并提交，`Discard` 放弃草稿。
+- `PNG export` 面板只导出已提交场景；分辨率倍率默认是 4。
+
+从命令行直接导出预设 3 的 2880 x 2880 PNG 与同名 JSON：
+
+```powershell
+.\build\Release\qrp_realtime.exe --preset 3 --export output\exports\pattern.png --export-scale 4
+```
+
+也可用 `--size WIDTH HEIGHT` 指定画布并居中铺满（必要时裁切网格）；详见
+[PNG 与参数导出](./docs/export.md)。
 
 运行隐藏窗口的 GPU/CPU 分阶段一致性检查：
 
@@ -76,6 +88,6 @@ ctest --test-dir build -C Release --output-on-failure
 cmake --build build --config Release --target qrp_gpu_validate
 ```
 
-实时目标通过 CMake 固定并获取 GLFW 3.4 与 Dear ImGui 1.92.9；仓库内包含由 glad
+构建系统固定并获取 LodePNG、GLFW 3.4 与 Dear ImGui 1.92.9；仓库内包含由 glad
 2.0.8 生成的纯 OpenGL 4.3 core loader，因此构建不依赖额外 Python 包。若只需要 CPU
 目标，可在配置时传入 `-DQRP_BUILD_REALTIME=OFF`。

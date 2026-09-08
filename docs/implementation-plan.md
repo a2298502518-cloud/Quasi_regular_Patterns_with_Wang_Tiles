@@ -67,6 +67,7 @@ src/math/             CPU 参考数学实现
 src/generators/       生成器参数与 CPU 参考实现
 src/render/           OpenGL 渲染后端
 src/ui/               应用界面与交互状态
+src/export/           PNG/PPM 编码与可复现参数伴随文件
 shaders/              独立 GLSL 源码
 tests/                数学、铺砌和一致性测试
 assets/presets/       可复现的艺术预设
@@ -74,8 +75,8 @@ assets/presets/       可复现的艺术预设
 
 ## 6. 分阶段实施
 
-当前进度：阶段 A、B、C、D 已完成并通过 CPU/GPU 分阶段对照、draft/committed 事务
-测试、三套展示预设及高低缩放视觉检查；阶段 E 为下一步。
+当前进度：阶段 A、B、C、D、E 已完成并通过 CPU/GPU 分阶段对照、draft/committed
+事务测试、三套展示预设、高低缩放视觉检查，以及预览/PNG 逐像素对照；阶段 F 尚未开始。
 
 ### 阶段 A：可验证的 CPU 数学核心
 
@@ -120,6 +121,10 @@ assets/presets/       可复现的艺术预设
 - 参数与随机种子伴随导出保存。
 - 验证屏幕和导出使用相同坐标、颜色与实例定义。
 - 补齐构建说明、示例图和性能记录。
+
+完成条件：1 倍率预览与 PNG 导出在相同场景、相机和材质下逐像素一致；PNG 明确标记
+sRGB，JSON 保存完整 committed 参数、精确种子、revision、相机和输出尺寸。当前实现已
+满足这些条件。
 
 ### 阶段 F：任意四边形网格
 

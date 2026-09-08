@@ -1,4 +1,6 @@
 #include "color/GradientPalette.hpp"
+#include "export/PngWriter.hpp"
+#include "export/ProjectMetadataWriter.hpp"
 #include "generators/HybridTorusGenerator.hpp"
 #include "generators/PeriodicGradientNoise.hpp"
 #include "generators/TorusFourier.hpp"
@@ -9,7 +11,9 @@
 #include "render/CpuReferenceRenderer.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -271,6 +275,46 @@ void testMaterialSettingsCommitAtomically() {
     require(project.revision() == firstRevision + 1, "failed material Apply must preserve revision");
 }
 
+void testPngEncodingCarriesSrgbMetadata() {
+    qrp::render::Image image(2, 2);
+    image.pixel(0, 0) = {255, 0, 0};
+    image.pixel(1, 0) = {0, 255, 0};
+    image.pixel(0, 1) = {0, 0, 255};
+    image.pixel(1, 1) = {255, 255, 255};
+    const auto encoded = qrp::exporting::encodePng(image);
+    constexpr std::array<std::uint8_t, 8> signature{
+        137, 80, 78, 71, 13, 10, 26, 10,
+    };
+    require(
+        encoded.size() > signature.size()
+            && std::equal(signature.begin(), signature.end(), encoded.begin()),
+        "PNG signature must be valid");
+    const auto containsChunk = [&encoded](const std::string_view name) {
+        return std::search(encoded.begin(), encoded.end(), name.begin(), name.end())
+            != encoded.end();
+    };
+    require(containsChunk("sRGB"), "PNG must declare the sRGB color space");
+    require(containsChunk("gAMA"), "PNG must carry the matching sRGB gamma chunk");
+}
+
+void testProjectMetadataIsCompleteAndStable() {
+    const auto presets = qrp::presets::createBaselinePresets();
+    const auto configuration = qrp::project::configurationFromPreset(presets.at(2));
+    const auto json = qrp::exporting::serializeProjectMetadata(
+        configuration,
+        7,
+        qrp::exporting::ExportView{2880, 2880, 0.0, 0.0, 288.0, true});
+    require(json.find("\"schemaVersion\": 1") != std::string::npos, "metadata needs a schema");
+    require(json.find("\"projectRevision\": 7") != std::string::npos, "metadata needs revision");
+    require(json.find("\"width\": 2880") != std::string::npos, "metadata needs width");
+    require(json.find("\"interpolation\": \"Oklab\"") != std::string::npos, "metadata needs color semantics");
+    require(json.find("\"seedHex\": \"0x") != std::string::npos, "metadata needs an exact seed");
+    require(json.find("\"model\": \"hybrid_torus_v1\"") != std::string::npos, "metadata needs generator semantics");
+    require(json.find("\"fourierModes\"") != std::string::npos, "metadata needs Fourier basis data");
+    require(json.find("\"periodicNoise\"") != std::string::npos, "metadata needs noise basis data");
+    require(json.find("\"material\"") != std::string::npos, "metadata needs material settings");
+}
+
 } // namespace
 
 int main() {
@@ -283,6 +327,8 @@ int main() {
         {"CPU reference render", testCpuReferenceRender},
         {"project draft/commit transaction", testProjectDraftCommitTransaction},
         {"material settings transaction", testMaterialSettingsCommitAtomically},
+        {"PNG sRGB metadata", testPngEncodingCarriesSrgbMetadata},
+        {"project export metadata", testProjectMetadataIsCompleteAndStable},
     };
 
     int failures = 0;

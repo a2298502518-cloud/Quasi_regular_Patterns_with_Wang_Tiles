@@ -301,6 +301,107 @@ void GpuPatternRenderer::draw(
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
+render::Image GpuPatternRenderer::renderImage(
+    const int width,
+    const int height,
+    const Camera2D& camera,
+    const DebugView debugView,
+    const bool enableMaterial) const {
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("GPU export dimensions must be positive.");
+    }
+    GLint maximumTextureSize = 0;
+    std::array<GLint, 2> maximumViewport{};
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximumTextureSize);
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maximumViewport.data());
+    if (width > maximumTextureSize || height > maximumTextureSize
+        || width > maximumViewport[0] || height > maximumViewport[1]) {
+        throw std::length_error("GPU export dimensions exceed the device limit.");
+    }
+
+    GLint previousFramebuffer = 0;
+    GLint previousPackAlignment = 0;
+    std::array<GLint, 4> previousViewport{};
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &previousPackAlignment);
+    glGetIntegerv(GL_VIEWPORT, previousViewport.data());
+
+    GLuint framebuffer = 0;
+    GLuint texture = 0;
+    glGenFramebuffers(1, &framebuffer);
+    glGenTextures(1, &texture);
+    const auto restore = [&]() noexcept {
+        glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFramebuffer));
+        glViewport(
+            previousViewport[0],
+            previousViewport[1],
+            previousViewport[2],
+            previousViewport[3]);
+        glPixelStorei(GL_PACK_ALIGNMENT, previousPackAlignment);
+        if (texture != 0) {
+            glDeleteTextures(1, &texture);
+        }
+        if (framebuffer != 0) {
+            glDeleteFramebuffers(1, &framebuffer);
+        }
+    };
+
+    try {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGB8,
+            width,
+            height,
+            0,
+            GL_RGB,
+            GL_UNSIGNED_BYTE,
+            nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D,
+            texture,
+            0);
+        constexpr GLenum drawBuffer = GL_COLOR_ATTACHMENT0;
+        glDrawBuffers(1, &drawBuffer);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            throw std::runtime_error("GPU export framebuffer is incomplete.");
+        }
+
+        draw(width, height, camera, debugView, enableMaterial);
+        glFinish();
+        std::vector<std::uint8_t> pixels(
+            static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+        render::Image image(
+            static_cast<std::size_t>(width),
+            static_cast<std::size_t>(height));
+        for (int y = 0; y < height; ++y) {
+            const int sourceY = height - 1 - y;
+            for (int x = 0; x < width; ++x) {
+                const std::size_t offset = (
+                    static_cast<std::size_t>(sourceY) * static_cast<std::size_t>(width)
+                    + static_cast<std::size_t>(x)) * 3U;
+                image.pixel(static_cast<std::size_t>(x), static_cast<std::size_t>(y)) = {
+                    pixels[offset], pixels[offset + 1U], pixels[offset + 2U]};
+            }
+        }
+        restore();
+        return image;
+    } catch (...) {
+        restore();
+        throw;
+    }
+}
+
 GpuValidationBuffers GpuPatternRenderer::renderValidationBuffers(
     const int width,
     const int height,

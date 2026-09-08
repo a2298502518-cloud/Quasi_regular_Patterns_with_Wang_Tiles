@@ -10,9 +10,21 @@ project(
 option(QRP_BUILD_TESTS "Build the CPU reference tests" ON)
 option(QRP_BUILD_REALTIME "Build the GLFW/OpenGL realtime application" ON)
 
-if(QRP_BUILD_REALTIME)
-    include(FetchContent)
+include(FetchContent)
 
+FetchContent_Declare(
+    lodepng
+    GIT_REPOSITORY https://github.com/lvandeve/lodepng.git
+    GIT_TAG ed6fe5825c6a4fbb7f58ab35a4231c7543cd452a
+)
+FetchContent_MakeAvailable(lodepng)
+
+add_library(qrp_lodepng STATIC
+    "${lodepng_SOURCE_DIR}/lodepng.cpp"
+)
+target_include_directories(qrp_lodepng SYSTEM PUBLIC "${lodepng_SOURCE_DIR}")
+
+if(QRP_BUILD_REALTIME)
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -116,7 +128,6 @@ target_link_libraries(qrp_project
 target_compile_features(qrp_project PUBLIC cxx_std_20)
 
 add_library(qrp_render STATIC
-    src/export/PpmWriter.cpp
     src/render/CpuReferenceRenderer.cpp
     src/render/Image.cpp
 )
@@ -130,11 +141,25 @@ target_link_libraries(qrp_render
 )
 target_compile_features(qrp_render PUBLIC cxx_std_20)
 
+add_library(qrp_export STATIC
+    src/export/PngWriter.cpp
+    src/export/PpmWriter.cpp
+    src/export/ProjectMetadataWriter.cpp
+)
+
+target_link_libraries(qrp_export
+    PUBLIC
+        qrp_lodepng
+        qrp_project
+        qrp_render
+)
+target_compile_features(qrp_export PUBLIC cxx_std_20)
+
 add_executable(qrp_cpu_reference
     apps/cpu_reference_main.cpp
 )
 
-target_link_libraries(qrp_cpu_reference PRIVATE qrp_presets qrp_render)
+target_link_libraries(qrp_cpu_reference PRIVATE qrp_export qrp_presets qrp_render)
 target_compile_features(qrp_cpu_reference PRIVATE cxx_std_20)
 
 if(QRP_BUILD_REALTIME)
@@ -171,6 +196,7 @@ if(QRP_BUILD_REALTIME)
         PRIVATE
             glfw
             qrp_glad
+            qrp_export
             qrp_opengl
             qrp_project
             qrp_presets
@@ -203,6 +229,7 @@ foreach(target
     qrp_presets
     qrp_project
     qrp_render
+    qrp_export
     qrp_cpu_reference
 )
     if(MSVC)

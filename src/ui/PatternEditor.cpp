@@ -155,13 +155,20 @@ void EditorRuntime::render() const {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+PatternEditor::PatternEditor() {
+    constexpr std::string_view defaultPath = "output/exports/pattern.png";
+    std::copy(defaultPath.begin(), defaultPath.end(), exportPath_.begin());
+}
+
 EditorActions PatternEditor::draw(
     project::PatternConfiguration& draft,
+    const project::PatternConfiguration& committed,
     const bool dirty,
     const std::uint64_t revision,
     const project::ApplyResult& lastResult,
+    const std::string_view exportStatus,
     render::opengl::DebugView& debugView,
-    const std::vector<presets::PatternPreset>& presets) const {
+    const std::vector<presets::PatternPreset>& presets) {
     EditorActions actions;
     ImGui::SetNextWindowPos({18.0F, 18.0F}, ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize({390.0F, 730.0F}, ImGuiCond_FirstUseEver);
@@ -227,6 +234,32 @@ EditorActions PatternEditor::draw(
         }
         if (ImGui::Button("Reset camera", {-FLT_MIN, 0.0F})) {
             actions.resetCamera = true;
+        }
+    }
+    if (ImGui::CollapsingHeader("PNG export", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::InputText("Path", exportPath_.data(), exportPath_.size());
+        ImGui::SliderInt("Resolution scale", &exportScale_, 1, 16);
+        const std::uint64_t width = static_cast<std::uint64_t>(committed.gridWidth)
+            * committed.pixelsPerTile * static_cast<std::uint64_t>(exportScale_);
+        const std::uint64_t height = static_cast<std::uint64_t>(committed.gridHeight)
+            * committed.pixelsPerTile * static_cast<std::uint64_t>(exportScale_);
+        ImGui::Text(
+            "Committed output: %llu x %llu",
+            static_cast<unsigned long long>(width),
+            static_cast<unsigned long long>(height));
+        if (dirty) {
+            ImGui::TextColored(
+                {0.98F, 0.70F, 0.26F, 1.0F},
+                "Apply the draft first; export always uses committed parameters.");
+        }
+        if (ImGui::Button("Export PNG + JSON", {-FLT_MIN, 0.0F})) {
+            actions.exportPattern = ExportIntent{
+                std::filesystem::path(exportPath_.data()),
+                exportScale_,
+            };
+        }
+        if (!exportStatus.empty()) {
+            ImGui::TextWrapped("%.*s", static_cast<int>(exportStatus.size()), exportStatus.data());
         }
     }
 

@@ -1,4 +1,6 @@
+#include "export/PngWriter.hpp"
 #include "export/PpmWriter.hpp"
+#include "export/ProjectMetadataWriter.hpp"
 #include "generators/HybridTorusGenerator.hpp"
 #include "generators/PeriodicGradientNoise.hpp"
 #include "generators/TorusFourier.hpp"
@@ -40,11 +42,14 @@ struct CommandLineOptions {
     bool capture = false;
     bool captureUi = false;
     bool validate = false;
+    bool exportPng = false;
+    bool exportScaleSpecified = false;
     std::filesystem::path capturePath = "output/gpu/gpu_capture.ppm";
     std::size_t presetIndex = 2;
     DebugView debugView = DebugView::Pattern;
     int captureWidth = 0;
     int captureHeight = 0;
+    int exportScale = 4;
     bool cameraOverride = false;
     Camera2D camera;
     int benchmarkFrames = 0;
@@ -94,6 +99,22 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
             }
             options.capture = true;
             options.capturePath = argv[++index];
+        } else if (argument == "--export") {
+            if (index + 1 >= argc) {
+                throw std::invalid_argument("--export requires a PNG output path.");
+            }
+            options.capture = true;
+            options.exportPng = true;
+            options.capturePath = argv[++index];
+        } else if (argument == "--export-scale") {
+            if (index + 1 >= argc) {
+                throw std::invalid_argument("--export-scale requires an integer from 1 to 16.");
+            }
+            options.exportScale = std::stoi(argv[++index]);
+            options.exportScaleSpecified = true;
+            if (options.exportScale < 1 || options.exportScale > 16) {
+                throw std::out_of_range("Export scale must be from 1 to 16.");
+            }
         } else if (argument == "--capture-ui") {
             if (index + 1 >= argc) {
                 throw std::invalid_argument("--capture-ui requires an output path.");
@@ -165,6 +186,18 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
             throw std::invalid_argument("Unknown command-line argument: " + std::string(argument));
         }
     }
+    if (options.exportScaleSpecified && !options.exportPng) {
+        throw std::invalid_argument("--export-scale requires --export.");
+    }
+    if (options.exportPng && (options.captureUi || options.validate || options.benchmarkFrames > 0)) {
+        throw std::invalid_argument("--export cannot be combined with UI capture, validation, or benchmark.");
+    }
+    if (options.exportPng && options.capturePath.extension() != ".png") {
+        throw std::invalid_argument("--export output path must use the .png extension.");
+    }
+    if (options.exportPng && options.exportScaleSpecified && options.captureWidth > 0) {
+        throw std::invalid_argument("Choose either --export-scale or --size for PNG export.");
+    }
     return options;
 }
 
@@ -180,6 +213,64 @@ void resetCamera(
     camera.originY = 0.5 * (
         static_cast<double>(configuration.gridHeight)
         - static_cast<double>(framebufferHeight) / camera.pixelsPerTile);
+}
+
+void fitCamera(
+    const qrp::project::PatternConfiguration& configuration,
+    const int width,
+    const int height,
+    Camera2D& camera) {
+    // 自定义画布默认铺满输出，避免在网格纵横比不同处生成无定义的黑边。
+    camera.pixelsPerTile = std::max(
+        static_cast<double>(width) / static_cast<double>(configuration.gridWidth),
+        static_cast<double>(height) / static_cast<double>(configuration.gridHeight));
+    camera.originX = 0.5 * (
+        static_cast<double>(configuration.gridWidth)
+        - static_cast<double>(width) / camera.pixelsPerTile);
+    camera.originY = 0.5 * (
+        static_cast<double>(configuration.gridHeight)
+        - static_cast<double>(height) / camera.pixelsPerTile);
+}
+
+[[nodiscard]] int checkedExportDimension(
+    const std::size_t tiles,
+    const std::uint32_t pixelsPerTile,
+    const int scale) {
+    const std::uint64_t dimension = static_cast<std::uint64_t>(tiles)
+        * static_cast<std::uint64_t>(pixelsPerTile)
+        * static_cast<std::uint64_t>(scale);
+    if (dimension == 0 || dimension > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+        throw std::length_error("Export dimensions exceed the application limit.");
+    }
+    return static_cast<int>(dimension);
+}
+
+void writePatternExport(
+    const qrp::render::opengl::GpuPatternRenderer& renderer,
+    const qrp::project::PatternProject& project,
+    const std::filesystem::path& pngPath,
+    const int width,
+    const int height,
+    const Camera2D& camera) {
+    if (!pngPath.parent_path().empty()) {
+        std::filesystem::create_directories(pngPath.parent_path());
+    }
+    const auto image = renderer.renderImage(width, height, camera);
+    qrp::exporting::writePng(image, pngPath);
+    auto metadataPath = pngPath;
+    metadataPath.replace_extension(".json");
+    qrp::exporting::writeProjectMetadata(
+        project.committed(),
+        project.revision(),
+        qrp::exporting::ExportView{
+            static_cast<std::uint32_t>(width),
+            static_cast<std::uint32_t>(height),
+            camera.originX,
+            camera.originY,
+            camera.pixelsPerTile,
+            true,
+        },
+        metadataPath);
 }
 
 void errorCallback(const int code, const char* description) {
@@ -466,12 +557,16 @@ int main(int argc, char** argv) {
             throw std::invalid_argument(
                 "GPU validation requires the default size, camera, and pattern view.");
         }
-        const int initialWidth = options.captureWidth > 0
+        const int initialWidth = options.exportPng
+            ? 64
+            : options.captureWidth > 0
             ? options.captureWidth
             : options.capture
                 ? static_cast<int>(initialPreset.gridWidth * initialPreset.pixelsPerTile)
             : 1100;
-        const int initialHeight = options.captureHeight > 0
+        const int initialHeight = options.exportPng
+            ? 64
+            : options.captureHeight > 0
             ? options.captureHeight
             : options.capture
                 ? static_cast<int>(initialPreset.gridHeight * initialPreset.pixelsPerTile)
@@ -548,7 +643,7 @@ int main(int argc, char** argv) {
             return 0;
         }
 
-        if (options.capture) {
+        if (options.capture && !options.exportPng) {
             if (options.cameraOverride) {
                 state.camera = options.camera;
             } else if (options.captureWidth == 0) {
@@ -558,30 +653,79 @@ int main(int argc, char** argv) {
         }
 
         if (options.capture) {
-            if (options.captureUi) {
-                glfwPollEvents();
-                qrp::ui::EditorRuntime editorRuntime(window.get());
-                const qrp::ui::PatternEditor editor;
-                editorRuntime.beginFrame();
-                static_cast<void>(editor.draw(
-                    project.draft(),
-                    project.isDirty(),
-                    project.revision(),
-                    project.lastApplyResult(),
-                    state.debugView,
-                    presets));
-                renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
-                editorRuntime.render();
-            } else {
-                renderer.draw(
+            if (options.exportPng) {
+                const auto& configuration = project.committed();
+                const int width = options.captureWidth > 0
+                    ? options.captureWidth
+                    : checkedExportDimension(
+                        configuration.gridWidth,
+                        configuration.pixelsPerTile,
+                        options.exportScale);
+                const int height = options.captureHeight > 0
+                    ? options.captureHeight
+                    : checkedExportDimension(
+                        configuration.gridHeight,
+                        configuration.pixelsPerTile,
+                        options.exportScale);
+                Camera2D exportCamera;
+                if (options.cameraOverride) {
+                    exportCamera = options.camera;
+                } else if (options.captureWidth > 0) {
+                    fitCamera(configuration, width, height, exportCamera);
+                } else {
+                    exportCamera = {
+                        0.0,
+                        0.0,
+                        static_cast<double>(configuration.pixelsPerTile)
+                            * static_cast<double>(options.exportScale),
+                    };
+                }
+                writePatternExport(
+                    renderer,
+                    project,
+                    options.capturePath,
+                    width,
+                    height,
+                    exportCamera);
+                auto metadataPath = options.capturePath;
+                metadataPath.replace_extension(".json");
+                std::cout << "Exported " << width << 'x' << height << " PNG to "
+                          << options.capturePath.string() << " with metadata "
+                          << metadataPath.string() << '\n';
+                return 0;
+            }
+
+            const auto gpuImage = [&]() {
+                if (options.captureUi) {
+                    glfwPollEvents();
+                    qrp::ui::EditorRuntime editorRuntime(window.get());
+                    qrp::ui::PatternEditor editor;
+                    editorRuntime.beginFrame();
+                    static_cast<void>(editor.draw(
+                        project.draft(),
+                        project.committed(),
+                        project.isDirty(),
+                        project.revision(),
+                        project.lastApplyResult(),
+                        {},
+                        state.debugView,
+                        presets));
+                    renderer.draw(
+                        framebufferWidth,
+                        framebufferHeight,
+                        state.camera,
+                        state.debugView);
+                    editorRuntime.render();
+                    glFinish();
+                    return readFramebuffer(framebufferWidth, framebufferHeight);
+                }
+                return renderer.renderImage(
                     framebufferWidth,
                     framebufferHeight,
                     state.camera,
                     state.debugView,
                     !options.validate);
-            }
-            glFinish();
-            const auto gpuImage = readFramebuffer(framebufferWidth, framebufferHeight);
+            }();
             if (!options.capturePath.parent_path().empty()) {
                 std::filesystem::create_directories(options.capturePath.parent_path());
             }
@@ -647,7 +791,8 @@ int main(int argc, char** argv) {
 
         glfwSwapInterval(1);
         qrp::ui::EditorRuntime editorRuntime(window.get());
-        const qrp::ui::PatternEditor editor;
+        qrp::ui::PatternEditor editor;
+        std::string exportStatus;
         auto titleStart = std::chrono::steady_clock::now();
         std::uint64_t titleFrames = 0;
         while (glfwWindowShouldClose(window.get()) == GLFW_FALSE) {
@@ -684,9 +829,11 @@ int main(int argc, char** argv) {
             editorRuntime.beginFrame();
             const auto actions = editor.draw(
                 project.draft(),
+                project.committed(),
                 project.isDirty(),
                 project.revision(),
                 project.lastApplyResult(),
+                exportStatus,
                 state.debugView,
                 presets);
             if (actions.loadPreset) {
@@ -707,6 +854,40 @@ int main(int argc, char** argv) {
                     framebufferWidth,
                     framebufferHeight,
                     state.camera);
+            }
+            if (actions.exportPattern) {
+                try {
+                    const auto& request = *actions.exportPattern;
+                    if (request.path.empty() || request.path.extension() != ".png") {
+                        throw std::invalid_argument("Export path must end in .png.");
+                    }
+                    const auto& configuration = project.committed();
+                    const int width = checkedExportDimension(
+                        configuration.gridWidth,
+                        configuration.pixelsPerTile,
+                        request.scale);
+                    const int height = checkedExportDimension(
+                        configuration.gridHeight,
+                        configuration.pixelsPerTile,
+                        request.scale);
+                    const Camera2D exportCamera{
+                        0.0,
+                        0.0,
+                        static_cast<double>(configuration.pixelsPerTile)
+                            * static_cast<double>(request.scale),
+                    };
+                    writePatternExport(
+                        renderer,
+                        project,
+                        request.path,
+                        width,
+                        height,
+                        exportCamera);
+                    exportStatus = "Exported " + std::to_string(width) + " x "
+                        + std::to_string(height) + " PNG and JSON metadata.";
+                } catch (const std::exception& error) {
+                    exportStatus = std::string("Export failed: ") + error.what();
+                }
             }
 
             renderer.draw(framebufferWidth, framebufferHeight, state.camera, state.debugView);
