@@ -24,7 +24,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - 可编辑 Wang 网格、边函数、生成器和色带的 Dear ImGui 面板
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
-- natural/ridges/cells 标量 profile 与跨 tile 连续世界场，用于矿物、丝网印刷、水墨和迷彩等结构风格
+- natural/ridges/Worley cells 结构、连续世界场与软有限色阶，用于矿物、丝网印刷、水墨和迷彩等风格
 - 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
 
 代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足

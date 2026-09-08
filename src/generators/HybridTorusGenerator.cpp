@@ -33,6 +33,24 @@ namespace {
         * quinticFade(1.0 - parameter.y);
 }
 
+[[nodiscard]] std::uint32_t hashCell(
+    const int x,
+    const int y,
+    const std::uint32_t salt) noexcept {
+    std::uint32_t value = static_cast<std::uint32_t>(x) * 0x9e3779b9U
+        ^ static_cast<std::uint32_t>(y) * 0x85ebca6bU
+        ^ salt;
+    value ^= value >> 16U;
+    value *= 0x7feb352dU;
+    value ^= value >> 15U;
+    value *= 0x846ca68bU;
+    return value ^ (value >> 16U);
+}
+
+[[nodiscard]] double unitFloat24(const std::uint32_t value) noexcept {
+    return static_cast<double>(value >> 8U) / 16777216.0;
+}
+
 } // namespace
 
 bool isValid(const ScalarProfile profile) noexcept {
@@ -66,6 +84,10 @@ HybridTorusGenerator::HybridTorusGenerator(
         || !std::isfinite(settings_.worldFrequencyX)
         || !std::isfinite(settings_.worldFrequencyY)
         || !std::isfinite(settings_.worldDetailAmplitude)
+        || !std::isfinite(settings_.worldGrainAmplitude)
+        || !std::isfinite(settings_.cellularScale)
+        || settings_.cellularScale <= 0.0
+        || settings_.cellularScale > 4.0
         || !isValid(settings_.scalarProfile)) {
         throw std::invalid_argument("Hybrid generator settings must be finite.");
     }
@@ -137,6 +159,14 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             + 0.41 * std::sin(tertiaryWorldPhase)
             + 0.28 * std::cos(quaternaryWorldPhase)) / 2.32;
     }
+    double worldGrain = 0.0;
+    if (settings_.worldGrainAmplitude != 0.0) {
+        worldGrain = (
+            std::sin(5.3 * worldPhase + 0.8 * std::sin(1.7 * secondaryWorldPhase))
+            + 0.5 * std::cos(7.1 * secondaryWorldPhase - 0.35 * worldPhase)
+            + 0.25 * std::sin(13.7 * worldPhase + 0.6 * secondaryWorldPhase))
+            / 1.75;
+    }
     const TileVariationDescriptor tile = describeTile(input.tileSeed);
     const math::Vec2 tileOffset = tileDomainOffset(input.parameter, tile);
     const double window = boundaryWindow(input.parameter);
@@ -153,7 +183,15 @@ double HybridTorusGenerator::evaluate(const GeneratorInput& input) const noexcep
             * window
             * tileVariation(input.parameter, tile)
         + settings_.worldModulationAmplitude * std::sin(worldPhase)
-        + settings_.worldDetailAmplitude * worldDetail;
+        + settings_.worldDetailAmplitude * worldDetail
+        + settings_.worldGrainAmplitude * worldGrain;
+    if (settings_.scalarProfile == ScalarProfile::Cells) {
+        return std::clamp(
+            cellularField(input.world, settings_.cellularScale)
+                + 0.12 * std::tanh(value),
+            -1.0,
+            1.0);
+    }
     return applyScalarProfile(value, settings_.scalarProfile);
 }
 
@@ -165,11 +203,51 @@ double HybridTorusGenerator::applyScalarProfile(
     case ScalarProfile::Ridges:
         return 1.0 - 2.0 * std::abs(bounded);
     case ScalarProfile::Cells:
-        return std::cos(std::numbers::pi_v<double> * bounded);
+        return value;
     case ScalarProfile::Natural:
         return value;
     }
     return value;
+}
+
+double HybridTorusGenerator::cellularField(
+    const math::Vec2 world,
+    const double scale) noexcept {
+    const math::Vec2 point{world.x * scale, world.y * scale};
+    const int originX = static_cast<int>(std::floor(point.x));
+    const int originY = static_cast<int>(std::floor(point.y));
+    double nearest = 1.0e30;
+    double secondNearest = 1.0e30;
+    int nearestCellX = originX;
+    int nearestCellY = originY;
+    for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+        for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+            const int cellX = originX + offsetX;
+            const int cellY = originY + offsetY;
+            const double featureX = static_cast<double>(cellX) + 0.12
+                + 0.76 * unitFloat24(hashCell(cellX, cellY, 0x68bc21ebU));
+            const double featureY = static_cast<double>(cellY) + 0.12
+                + 0.76 * unitFloat24(hashCell(cellX, cellY, 0x02e5be93U));
+            const double dx = featureX - point.x;
+            const double dy = featureY - point.y;
+            const double distanceSquared = dx * dx + dy * dy;
+            if (distanceSquared < nearest) {
+                secondNearest = nearest;
+                nearest = distanceSquared;
+                nearestCellX = cellX;
+                nearestCellY = cellY;
+            } else if (distanceSquared < secondNearest) {
+                secondNearest = distanceSquared;
+            }
+        }
+    }
+    const double separation = std::sqrt(secondNearest) - std::sqrt(nearest);
+    const double transition = std::clamp((separation - 0.018) / 0.12, 0.0, 1.0);
+    const double edgeBlend = transition * transition * (3.0 - 2.0 * transition);
+    const double regionValue = -0.70 + 1.40 * unitFloat24(
+        hashCell(nearestCellX, nearestCellY, 0xa511e9b3U));
+    // 胞元身份给区域分配不同色阶；在中轴边界统一收束到深色，避免硬跳变。
+    return -0.95 + edgeBlend * (regionValue + 0.95);
 }
 
 math::Vec2 HybridTorusGenerator::tileDomainOffset(

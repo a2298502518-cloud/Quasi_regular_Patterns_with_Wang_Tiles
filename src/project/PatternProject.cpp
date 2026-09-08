@@ -30,6 +30,10 @@ namespace {
         && std::isfinite(settings.worldFrequencyX)
         && std::isfinite(settings.worldFrequencyY)
         && std::isfinite(settings.worldDetailAmplitude)
+        && std::isfinite(settings.worldGrainAmplitude)
+        && std::isfinite(settings.cellularScale)
+        && settings.cellularScale > 0.0
+        && settings.cellularScale <= 4.0
         && generators::isValid(settings.scalarProfile);
 }
 

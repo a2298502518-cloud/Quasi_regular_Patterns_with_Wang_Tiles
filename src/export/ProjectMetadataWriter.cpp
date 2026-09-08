@@ -83,7 +83,7 @@ std::string serializeProjectMetadata(
     const auto& noiseSettings = noise.settings();
     stream << "  ],\n"
            << "  \"generator\": {\n"
-           << "    \"model\": \"hybrid_torus_v2\",\n"
+           << "    \"model\": \"hybrid_torus_v3\",\n"
            << "    \"scalarProfile\": \""
            << generators::scalarProfileName(generator.scalarProfile) << "\",\n"
            << "    \"fourierWeight\": " << generator.fourierWeight << ",\n"
@@ -95,6 +95,8 @@ std::string serializeProjectMetadata(
            << "    \"worldFrequencyX\": " << generator.worldFrequencyX << ",\n"
            << "    \"worldFrequencyY\": " << generator.worldFrequencyY << ",\n"
            << "    \"worldDetailAmplitude\": " << generator.worldDetailAmplitude << ",\n"
+           << "    \"worldGrainAmplitude\": " << generator.worldGrainAmplitude << ",\n"
+           << "    \"cellularScale\": " << generator.cellularScale << ",\n"
            << "    \"fourierModes\": [\n";
     for (std::size_t index = 0; index < fourier.modes().size(); ++index) {
         const auto& mode = fourier.modes()[index];
@@ -116,7 +118,10 @@ std::string serializeProjectMetadata(
            << "    \"tone\": {\"center\": " << configuration.tone.center
            << ", \"contrast\": " << configuration.tone.contrast
            << ", \"bandFrequency\": " << configuration.tone.bandFrequency
-           << ", \"bandStrength\": " << configuration.tone.bandStrength << "},\n"
+           << ", \"bandStrength\": " << configuration.tone.bandStrength
+           << ", \"posterizeLevels\": " << configuration.tone.posterizeLevels
+           << ", \"posterizeSoftness\": " << configuration.tone.posterizeSoftness
+           << "},\n"
            << "    \"stops\": [\n";
     for (std::size_t index = 0; index < configuration.colorStops.size(); ++index) {
         const auto& stop = configuration.colorStops[index];

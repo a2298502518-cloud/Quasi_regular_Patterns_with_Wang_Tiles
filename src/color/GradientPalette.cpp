@@ -108,7 +108,12 @@ GradientPalette::GradientPalette(
         || tone_.bandFrequency < 0.0
         || !std::isfinite(tone_.bandStrength)
         || tone_.bandStrength < 0.0
-        || tone_.bandStrength > 1.0) {
+        || tone_.bandStrength > 1.0
+        || tone_.posterizeLevels == 1U
+        || tone_.posterizeLevels > 8U
+        || !std::isfinite(tone_.posterizeSoftness)
+        || tone_.posterizeSoftness <= 0.0
+        || tone_.posterizeSoftness >= 0.5) {
         throw std::invalid_argument("Invalid gradient palette settings.");
     }
 
@@ -169,12 +174,10 @@ GradientPalette GradientPalette::createAurora() {
 GradientPalette GradientPalette::createGraphicPrimary() {
     return GradientPalette({
         {0.00, linearRgbFromSrgb8(10, 20, 38)},
-        {0.30, linearRgbFromSrgb8(24, 55, 96)},
-        {0.43, linearRgbFromSrgb8(235, 229, 204)},
-        {0.58, linearRgbFromSrgb8(250, 244, 224)},
-        {0.70, linearRgbFromSrgb8(218, 62, 45)},
-        {1.00, linearRgbFromSrgb8(241, 170, 35)},
-    }, ToneSettings{0.0, 2.35, 0.0, 0.0});
+        {1.0 / 3.0, linearRgbFromSrgb8(24, 62, 105)},
+        {2.0 / 3.0, linearRgbFromSrgb8(239, 229, 198)},
+        {1.00, linearRgbFromSrgb8(222, 67, 43)},
+    }, ToneSettings{0.0, 1.80, 0.0, 0.0, 4, 0.14});
 }
 
 GradientPalette GradientPalette::createInkWash() {
@@ -196,7 +199,7 @@ GradientPalette GradientPalette::createFieldCamo() {
         {0.61, linearRgbFromSrgb8(181, 164, 108)},
         {0.78, linearRgbFromSrgb8(211, 181, 126)},
         {1.00, linearRgbFromSrgb8(82, 54, 36)},
-    }, ToneSettings{0.02, 2.75, 3.0, 0.08});
+    }, ToneSettings{0.02, 1.90, 0.0, 0.0});
 }
 
 const std::vector<ColorStop>& GradientPalette::stops() const noexcept {
@@ -216,6 +219,19 @@ Color3 GradientPalette::sample(const double scalar) const noexcept {
             + tone_.bandStrength * band;
     }
     coordinate = std::clamp(coordinate, 0.0, 1.0);
+    if (tone_.posterizeLevels >= 2U) {
+        const double intervals = static_cast<double>(tone_.posterizeLevels - 1U);
+        const double scaled = coordinate * intervals;
+        const double lower = std::min(std::floor(scaled), intervals - 1.0);
+        const double fraction = scaled - lower;
+        const double transition = std::clamp(
+            (fraction - (0.5 - tone_.posterizeSoftness))
+                / (2.0 * tone_.posterizeSoftness),
+            0.0,
+            1.0);
+        // 有限宽度的平滑阶跃保留丝网印刷的色块，同时避免采样锯齿。
+        coordinate = (lower + smoothstep(transition)) / intervals;
+    }
 
     auto upper = std::upper_bound(
         stops_.begin(),

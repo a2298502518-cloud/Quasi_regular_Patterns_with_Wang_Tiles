@@ -25,6 +25,8 @@ struct ToneSettings {
     double contrast = 1.8;
     double bandFrequency = 0.0;
     double bandStrength = 0.0;
+    std::uint32_t posterizeLevels = 0;
+    double posterizeSoftness = 0.12;
 
     [[nodiscard]] bool operator==(const ToneSettings&) const noexcept = default;
 };

@@ -37,12 +37,14 @@ uniform int u_colorStopCount;
 uniform float u_colorStopPosition[8];
 uniform vec3 u_colorStopValue[8];
 uniform vec4 u_toneSettings;
+uniform vec2 u_posterizeSettings;
 uniform vec4 u_materialSettings;
 
 uniform vec4 u_generatorWeights;
 uniform vec4 u_worldSettings;
 uniform int u_scalarProfile;
 uniform float u_worldDetailAmplitude;
+uniform vec2 u_styleStructureSettings;
 
 const float pi = 3.14159265358979323846;
 const float tau = 6.28318530717958647692;
@@ -225,6 +227,52 @@ float tileVariation(vec2 parameter, TileData tile) {
     return dot(values, vec4(1.0)) / 2.0833333333333333333;
 }
 
+uint hashCell(ivec2 cell, uint salt) {
+    uint value = uint(cell.x) * 0x9e3779b9u
+        ^ uint(cell.y) * 0x85ebca6bu
+        ^ salt;
+    value ^= value >> 16u;
+    value *= 0x7feb352du;
+    value ^= value >> 15u;
+    value *= 0x846ca68bu;
+    return value ^ (value >> 16u);
+}
+
+float unitFloat24(uint value) {
+    return float(value >> 8u) / 16777216.0;
+}
+
+float cellularField(vec2 world, float scale) {
+    vec2 point = world * scale;
+    ivec2 origin = ivec2(floor(point));
+    float nearest = 1.0e30;
+    float secondNearest = 1.0e30;
+    ivec2 nearestCell = origin;
+    for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+        for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+            ivec2 cell = origin + ivec2(offsetX, offsetY);
+            vec2 feature = vec2(cell) + vec2(
+                0.12 + 0.76 * unitFloat24(hashCell(cell, 0x68bc21ebu)),
+                0.12 + 0.76 * unitFloat24(hashCell(cell, 0x02e5be93u)));
+            vec2 delta = feature - point;
+            float distanceSquared = dot(delta, delta);
+            if (distanceSquared < nearest) {
+                secondNearest = nearest;
+                nearest = distanceSquared;
+                nearestCell = cell;
+            } else if (distanceSquared < secondNearest) {
+                secondNearest = distanceSquared;
+            }
+        }
+    }
+    float separation = sqrt(secondNearest) - sqrt(nearest);
+    float transition = clamp((separation - 0.018) / 0.12, 0.0, 1.0);
+    float edgeBlend = transition * transition * (3.0 - 2.0 * transition);
+    float regionValue = -0.70
+        + 1.40 * unitFloat24(hashCell(nearestCell, 0xa511e9b3u));
+    return -0.95 + edgeBlend * (regionValue + 0.95);
+}
+
 float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
     float worldPhase = tau * (
         u_worldSettings.z * world.x + u_worldSettings.w * world.y);
@@ -247,6 +295,14 @@ float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
             + 0.41 * sin(tertiaryWorldPhase)
             + 0.28 * cos(quaternaryWorldPhase)) / 2.32;
     }
+    float worldGrain = 0.0;
+    if (u_styleStructureSettings.x != 0.0) {
+        worldGrain = (
+            sin(5.3 * worldPhase + 0.8 * sin(1.7 * secondaryWorldPhase))
+            + 0.5 * cos(7.1 * secondaryWorldPhase - 0.35 * worldPhase)
+            + 0.25 * sin(13.7 * worldPhase + 0.6 * secondaryWorldPhase))
+            / 1.75;
+    }
     float window = boundaryWindow(parameter);
     vec2 warped = parameter
         + u_generatorWeights.w * window * tileDomainOffset(parameter, tile)
@@ -256,14 +312,18 @@ float evaluateGenerator(vec2 parameter, vec2 world, TileData tile) {
     float value = base
         + u_generatorWeights.z * window * tileVariation(parameter, tile)
         + u_worldSettings.x * sin(worldPhase)
-        + u_worldDetailAmplitude * worldDetail;
+        + u_worldDetailAmplitude * worldDetail
+        + u_styleStructureSettings.x * worldGrain;
     // 标量 profile 只重排连续场的层级，不改变 Wang 边界的取值一致性。
     float bounded = clamp(value, -1.0, 1.0);
     if (u_scalarProfile == 1) {
         return 1.0 - 2.0 * abs(bounded);
     }
     if (u_scalarProfile == 2) {
-        return cos(pi * bounded);
+        return clamp(
+            cellularField(world, u_styleStructureSettings.y) + 0.12 * tanh(value),
+            -1.0,
+            1.0);
     }
     return value;
 }
@@ -274,7 +334,22 @@ float toneCoordinate(float scalar) {
         float band = 0.5 + 0.5 * sin(tau * u_toneSettings.z * coordinate);
         coordinate = mix(coordinate, band, u_toneSettings.w);
     }
-    return clamp(coordinate, 0.0, 1.0);
+    coordinate = clamp(coordinate, 0.0, 1.0);
+    int posterizeLevels = int(u_posterizeSettings.x + 0.5);
+    if (posterizeLevels >= 2) {
+        float intervals = float(posterizeLevels - 1);
+        float scaled = coordinate * intervals;
+        float lower = min(floor(scaled), intervals - 1.0);
+        float fraction = scaled - lower;
+        float transition = clamp(
+            (fraction - (0.5 - u_posterizeSettings.y))
+                / (2.0 * u_posterizeSettings.y),
+            0.0,
+            1.0);
+        coordinate = (lower + transition * transition * (3.0 - 2.0 * transition))
+            / intervals;
+    }
+    return coordinate;
 }
 
 vec3 linearRgbToOklab(vec3 color) {

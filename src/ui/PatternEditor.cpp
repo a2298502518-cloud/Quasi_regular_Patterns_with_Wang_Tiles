@@ -54,7 +54,7 @@ void sliderDouble(
 
 void drawGenerator(generators::HybridGeneratorSettings& settings) {
     int profile = static_cast<int>(settings.scalarProfile);
-    constexpr const char* profiles[] = {"Natural field", "Ridges / ribbons", "Cellular rings"};
+    constexpr const char* profiles[] = {"Natural field", "Ridges / ribbons", "Worley cells"};
     if (ImGui::Combo("Scalar profile", &profile, profiles, 3)) {
         settings.scalarProfile = static_cast<generators::ScalarProfile>(profile);
     }
@@ -67,6 +67,10 @@ void drawGenerator(generators::HybridGeneratorSettings& settings) {
     sliderDouble("World frequency X", settings.worldFrequencyX, -0.5, 0.5, "%.4f");
     sliderDouble("World frequency Y", settings.worldFrequencyY, -0.5, 0.5, "%.4f");
     sliderDouble("World detail", settings.worldDetailAmplitude, 0.0, 1.5);
+    sliderDouble("World grain", settings.worldGrainAmplitude, 0.0, 0.6);
+    if (settings.scalarProfile == generators::ScalarProfile::Cells) {
+        sliderDouble("Cellular scale", settings.cellularScale, 0.15, 2.0);
+    }
 }
 
 void drawEdgePalette(std::vector<math::EdgeParameters>& edges) {
@@ -91,6 +95,22 @@ void drawColorRamp(
     sliderDouble("Contrast", tone.contrast, 0.2, 5.0);
     sliderDouble("Band frequency", tone.bandFrequency, 0.0, 16.0, "%.2f");
     sliderDouble("Band strength", tone.bandStrength, 0.0, 0.45);
+    bool posterized = tone.posterizeLevels >= 2U;
+    if (ImGui::Checkbox("Posterized color", &posterized)) {
+        tone.posterizeLevels = posterized ? 4U : 0U;
+    }
+    if (posterized) {
+        constexpr std::uint32_t minimumLevels = 2U;
+        constexpr std::uint32_t maximumLevels = 8U;
+        ImGui::SliderScalar(
+            "Posterize levels",
+            ImGuiDataType_U32,
+            &tone.posterizeLevels,
+            &minimumLevels,
+            &maximumLevels,
+            "%u");
+        sliderDouble("Posterize softness", tone.posterizeSoftness, 0.005, 0.45);
+    }
 
     for (std::size_t index = 0; index < stops.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));

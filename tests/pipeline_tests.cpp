@@ -134,6 +134,7 @@ void testScalarProfilesPreserveBoundaryContinuity() {
         auto settings = HybridGeneratorSettings{};
         settings.scalarProfile = profile;
         settings.worldDetailAmplitude = 0.9;
+        settings.worldGrainAmplitude = 0.25;
         const auto generator = createGenerator(settings);
         for (int index = 0; index <= 256; ++index) {
             const double t = static_cast<double>(index) / 256.0;
@@ -180,6 +181,31 @@ void testPaletteUsesPerceptualInterpolation() {
     requireNear(midpoint.red, 0.125, 2.0e-5, "Oklab midpoint red");
     requireNear(midpoint.green, 0.125, 2.0e-5, "Oklab midpoint green");
     requireNear(midpoint.blue, 0.125, 2.0e-5, "Oklab midpoint blue");
+}
+
+void testPosterizedPaletteUsesStablePlateaus() {
+    const qrp::color::GradientPalette palette({
+        {0.0, {0.0, 0.0, 0.0}},
+        {1.0, {1.0, 1.0, 1.0}},
+    }, qrp::color::ToneSettings{0.0, 1.0, 0.0, 0.0, 2, 0.10});
+    require(
+        palette.sample(-2.0) == palette.sample(-0.3),
+        "posterization must create a stable lower plateau");
+    require(
+        palette.sample(2.0) == palette.sample(0.3),
+        "posterization must create a stable upper plateau");
+
+    bool rejectedSingleLevel = false;
+    try {
+        const qrp::color::GradientPalette invalid({
+            {0.0, {0.0, 0.0, 0.0}},
+            {1.0, {1.0, 1.0, 1.0}},
+        }, qrp::color::ToneSettings{0.0, 1.0, 0.0, 0.0, 1, 0.10});
+        static_cast<void>(invalid);
+    } catch (const std::invalid_argument&) {
+        rejectedSingleLevel = true;
+    }
+    require(rejectedSingleLevel, "a one-level posterization must be rejected");
 }
 
 void testMeasuredSeams() {
@@ -280,6 +306,12 @@ void testProjectDraftCommitTransaction() {
     const auto invalidProfile = project.applyDraft();
     require(!invalidProfile.applied, "unknown scalar profiles must be rejected");
     require(project.committed() == committed, "invalid profiles must preserve committed state");
+
+    project.resetDraft();
+    project.draft().generator.cellularScale = 0.0;
+    const auto invalidCellularScale = project.applyDraft();
+    require(!invalidCellularScale.applied, "zero cellular scale must be rejected");
+    require(project.committed() == committed, "invalid cellular scale must preserve committed state");
 }
 
 void testMaterialSettingsCommitAtomically() {
@@ -342,9 +374,12 @@ void testProjectMetadataIsCompleteAndStable() {
     require(json.find("\"width\": 2880") != std::string::npos, "metadata needs width");
     require(json.find("\"interpolation\": \"Oklab\"") != std::string::npos, "metadata needs color semantics");
     require(json.find("\"seedHex\": \"0x") != std::string::npos, "metadata needs an exact seed");
-    require(json.find("\"model\": \"hybrid_torus_v2\"") != std::string::npos, "metadata needs generator semantics");
+    require(json.find("\"model\": \"hybrid_torus_v3\"") != std::string::npos, "metadata needs generator semantics");
     require(json.find("\"scalarProfile\": \"natural\"") != std::string::npos, "metadata needs scalar profile");
     require(json.find("\"worldDetailAmplitude\"") != std::string::npos, "metadata needs world detail");
+    require(json.find("\"worldGrainAmplitude\"") != std::string::npos, "metadata needs world grain");
+    require(json.find("\"cellularScale\"") != std::string::npos, "metadata needs cellular scale");
+    require(json.find("\"posterizeLevels\"") != std::string::npos, "metadata needs posterization");
     require(json.find("\"fourierModes\"") != std::string::npos, "metadata needs Fourier basis data");
     require(json.find("\"periodicNoise\"") != std::string::npos, "metadata needs noise basis data");
     require(json.find("\"material\"") != std::string::npos, "metadata needs material settings");
@@ -360,8 +395,14 @@ void testStylePresetsChangeStructureNotOnlyColor() {
         screenprint.generator.scalarProfile == qrp::generators::ScalarProfile::Ridges,
         "graphic screenprint must use the ridged scalar profile");
     require(
+        screenprint.palette.tone().posterizeLevels == 4,
+        "graphic screenprint must use a finite four-color treatment");
+    require(
         ink.generator.noiseWeight > 10.0 * ink.generator.fourierWeight,
         "ink wash must be structurally noise-dominant");
+    require(
+        ink.generator.worldGrainAmplitude > 0.0,
+        "ink wash must carry cross-tile world grain");
     require(
         cells.generator.scalarProfile == qrp::generators::ScalarProfile::Cells,
         "cellular camo must use the cellular scalar profile");
@@ -381,6 +422,7 @@ int main() {
         {"scalar profile boundaries", testScalarProfilesPreserveBoundaryContinuity},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
+        {"posterized palette plateaus", testPosterizedPaletteUsesStablePlateaus},
         {"measured seams", testMeasuredSeams},
         {"CPU reference render", testCpuReferenceRender},
         {"project draft/commit transaction", testProjectDraftCommitTransaction},

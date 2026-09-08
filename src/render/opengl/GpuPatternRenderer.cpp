@@ -239,6 +239,10 @@ void GpuPatternRenderer::uploadScene(
         narrow(tone.contrast),
         narrow(tone.bandFrequency),
         narrow(tone.bandStrength));
+    glUniform2f(
+        uniformLocation("u_posterizeSettings"),
+        static_cast<float>(tone.posterizeLevels),
+        narrow(tone.posterizeSoftness));
     material_ = material;
 
     const auto& settings = generator.settings();
@@ -260,6 +264,10 @@ void GpuPatternRenderer::uploadScene(
     glUniform1f(
         uniformLocation("u_worldDetailAmplitude"),
         narrow(settings.worldDetailAmplitude));
+    glUniform2f(
+        uniformLocation("u_styleStructureSettings"),
+        narrow(settings.worldGrainAmplitude),
+        narrow(settings.cellularScale));
     glUniform2i(
         uniformLocation("u_gridSize"),
         static_cast<GLint>(grid.width()),
