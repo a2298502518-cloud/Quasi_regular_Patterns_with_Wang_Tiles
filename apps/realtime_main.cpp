@@ -127,11 +127,11 @@ using WindowPointer = std::unique_ptr<GLFWwindow, WindowDeleter>;
             options.validate = true;
         } else if (argument == "--preset") {
             if (index + 1 >= argc) {
-                throw std::invalid_argument("--preset requires a positive preset index.");
+                throw std::invalid_argument("--preset requires an index from 1 to 5.");
             }
             const int humanIndex = std::stoi(argv[++index]);
-            if (humanIndex < 1) {
-                throw std::out_of_range("Preset index must be positive.");
+            if (humanIndex < 1 || humanIndex > 5) {
+                throw std::out_of_range("Preset index must be from 1 to 5.");
             }
             options.presetIndex = static_cast<std::size_t>(humanIndex - 1);
         } else if (argument == "--debug") {
@@ -299,7 +299,7 @@ void keyCallback(GLFWwindow* window, const int key, int, const int action, int) 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     } else if (qrp::ui::wantsKeyboardInput()) {
         return;
-    } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_8) {
+    } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_5) {
         state.requestedPreset = static_cast<std::size_t>(key - GLFW_KEY_1);
     } else if (key == GLFW_KEY_D) {
         const int next = (static_cast<int>(state.debugView) + 1) % 4;
@@ -503,7 +503,6 @@ struct IntermediateComparisonMetrics {
                 inverse.parameter,
                 qrp::math::Vec2{worldX, worldY},
                 tile.seed,
-                {tile.south, tile.north, tile.west, tile.east},
             });
             metrics.maximumScalarDifference = std::max(
                 metrics.maximumScalarDifference,

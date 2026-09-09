@@ -1,6 +1,6 @@
 # Quasi-regular Patterns with Wang Tiles
 
-一个面向论文复现与生成艺术创作的交互式图形项目。项目以 Wang Tiles、
+一个面向论文实现与生成艺术创作的交互式图形项目。项目以 Wang Tiles、
 domain-invariant Coons warp 和环面连续生成器为核心，在可验证无缝的前提下生成
 非周期、可调且适合高分辨率输出的图案。
 
@@ -12,23 +12,24 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - [实现计划](./docs/implementation-plan.md)
 - [数学与坐标规范](./docs/math-spec.md)
 - [验证方案](./docs/validation.md)
+- [文献地图与实现核查清单](./docs/literature-map.md)
+- [本地参考文献库说明与 BibTeX](./references/README.md)
 - [CPU 基准与复现记录](./docs/cpu-baselines.md)
 - [GPU 基准与一致性记录](./docs/gpu-baselines.md)
 - [交互编辑器与提交语义](./docs/interactive-editor.md)
 - [PNG 与参数导出](./docs/export.md)
-- [预设风格矩阵](./docs/style-presets.md)
+- [主论文与当前实现审计](./docs/paper-implementation-audit.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 - 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
-- 单瓦片、2 x 2 与六套 10 x 10 固定种子展示预设，以及独立接缝误差热图
+- 单瓦片、2 x 2 与三套 10 x 10 固定种子展示预设，以及独立接缝误差热图
 - OpenGL 4.3 实时主视图、相机平移缩放和 Jacobian/Newton/瓦片边界调试视图
 - 可编辑 Wang 网格、边函数、生成器和色带的 Dear ImGui 面板
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
-- natural/ridges/Worley cells、连续世界场、Wang 边配对墨线与软有限色阶，用于矿物、丝网印刷、水墨和迷彩等风格
 - 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
 
-代码实现以 `docs/math-spec.md` 为权威定义。论文是研究来源；论文中尚不充分或不满足
-周期条件的论证，不直接作为代码契约。
+本地主论文是研究工作的主体，`docs/math-spec.md` 是与论文同步维护的实现契约。外部
+论文只用于理论借鉴、术语澄清和相关工作比较，不作为本项目的独立复现目标。
 
 ## 目标形态
 
@@ -69,7 +70,7 @@ ctest --test-dir build -C Release --output-on-failure
 
 - 鼠标左键拖动：平移。
 - 滚轮：以光标为中心缩放。
-- `1`–`8`：切换固定预设；其中 `6`–`8` 是结构风格对照。
+- `1`–`5`：切换固定预设。
 - `D`：切换图案、Jacobian、Newton 残差和瓦片边界视图。
 - `R`：重置相机；`Esc`：退出。
 - 面板预设只载入草稿；`Apply validated draft` 校验并提交，`Discard` 放弃草稿。

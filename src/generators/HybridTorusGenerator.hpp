@@ -8,15 +8,6 @@
 
 namespace qrp::generators {
 
-enum class ScalarProfile : int {
-    Natural = 0,
-    Ridges = 1,
-    Cells = 2,
-};
-
-[[nodiscard]] bool isValid(ScalarProfile profile) noexcept;
-[[nodiscard]] const char* scalarProfileName(ScalarProfile profile) noexcept;
-
 struct HybridGeneratorSettings {
     double fourierWeight = 0.85;
     double noiseWeight = 0.30;
@@ -26,11 +17,6 @@ struct HybridGeneratorSettings {
     double worldDomainWarpAmplitude = 0.08;
     double worldFrequencyX = 0.137;
     double worldFrequencyY = 0.091;
-    double worldDetailAmplitude = 0.0;
-    ScalarProfile scalarProfile = ScalarProfile::Natural;
-    double worldGrainAmplitude = 0.0;
-    double cellularScale = 0.75;
-    double edgeStructureAmplitude = 0.0;
 
     [[nodiscard]] bool operator==(const HybridGeneratorSettings&) const noexcept = default;
 };
@@ -59,16 +45,6 @@ public:
     [[nodiscard]] double evaluate(const GeneratorInput& input) const noexcept override;
 
 private:
-    [[nodiscard]] static double applyScalarProfile(
-        double value,
-        ScalarProfile profile) noexcept;
-    [[nodiscard]] static double cellularField(
-        math::Vec2 world,
-        double scale) noexcept;
-    [[nodiscard]] static double edgeConnectedInk(
-        math::Vec2 parameter,
-        const std::array<std::uint32_t, 4>& edgeColors,
-        const TileVariationDescriptor& descriptor) noexcept;
     [[nodiscard]] static double tileVariation(
         math::Vec2 parameter,
         const TileVariationDescriptor& descriptor) noexcept;

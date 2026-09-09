@@ -124,74 +124,11 @@ void testTileVariationVanishesOnBoundary() {
     }
 }
 
-void testScalarProfilesPreserveBoundaryContinuity() {
-    constexpr std::array profiles{
-        qrp::generators::ScalarProfile::Natural,
-        qrp::generators::ScalarProfile::Ridges,
-        qrp::generators::ScalarProfile::Cells,
-    };
-    for (const auto profile : profiles) {
-        auto settings = HybridGeneratorSettings{};
-        settings.scalarProfile = profile;
-        settings.worldDetailAmplitude = 0.9;
-        settings.worldGrainAmplitude = 0.25;
-        const auto generator = createGenerator(settings);
-        for (int index = 0; index <= 256; ++index) {
-            const double t = static_cast<double>(index) / 256.0;
-            const Vec2 world{6.0 + t, 9.0};
-            requireNear(
-                generator.evaluate(GeneratorInput{Vec2{t, 0.0}, world, 17}),
-                generator.evaluate(GeneratorInput{Vec2{t, 1.0}, world, 91}),
-                2.0e-14,
-                std::string("profile boundary ")
-                    + qrp::generators::scalarProfileName(profile));
-        }
-    }
-}
-
-void testEdgeConnectedInkMatchesAcrossSharedEdges() {
-    auto settings = HybridGeneratorSettings{};
-    settings.fourierWeight = 0.0;
-    settings.noiseWeight = 0.0;
-    settings.tileVariationAmplitude = 0.0;
-    settings.tileDomainWarpAmplitude = 0.0;
-    settings.worldModulationAmplitude = 0.0;
-    settings.worldDomainWarpAmplitude = 0.0;
-    settings.worldDetailAmplitude = 0.0;
-    settings.worldGrainAmplitude = 0.0;
-    settings.edgeStructureAmplitude = 1.0;
-    const auto generator = createGenerator(settings);
-
-    for (int index = 0; index <= 400; ++index) {
-        const double t = static_cast<double>(index) / 400.0;
-        const Vec2 verticalWorld{9.0, 4.0 + t};
-        requireNear(
-            generator.evaluate(GeneratorInput{
-                Vec2{1.0, t}, verticalWorld, 17, {1, 2, 3, 7}}),
-            generator.evaluate(GeneratorInput{
-                Vec2{0.0, t}, verticalWorld, 91, {4, 5, 7, 6}}),
-            2.0e-14,
-            "edge ink vertical seam");
-
-        const Vec2 horizontalWorld{6.0 + t, 8.0};
-        requireNear(
-            generator.evaluate(GeneratorInput{
-                Vec2{t, 1.0}, horizontalWorld, 23, {8, 11, 9, 10}}),
-            generator.evaluate(GeneratorInput{
-                Vec2{t, 0.0}, horizontalWorld, 47, {11, 12, 13, 14}}),
-            2.0e-14,
-            "edge ink horizontal seam");
-    }
-}
-
 void testGradientPalettesStayFiniteAndBounded() {
     const std::vector<qrp::color::GradientPalette> palettes{
         qrp::color::GradientPalette::createMidnightGold(),
         qrp::color::GradientPalette::createMineral(),
         qrp::color::GradientPalette::createAurora(),
-        qrp::color::GradientPalette::createGraphicPrimary(),
-        qrp::color::GradientPalette::createInkWash(),
-        qrp::color::GradientPalette::createFieldCamo(),
     };
     for (const auto& palette : palettes) {
         for (int index = -1000; index <= 1000; ++index) {
@@ -216,31 +153,6 @@ void testPaletteUsesPerceptualInterpolation() {
     requireNear(midpoint.red, 0.125, 2.0e-5, "Oklab midpoint red");
     requireNear(midpoint.green, 0.125, 2.0e-5, "Oklab midpoint green");
     requireNear(midpoint.blue, 0.125, 2.0e-5, "Oklab midpoint blue");
-}
-
-void testPosterizedPaletteUsesStablePlateaus() {
-    const qrp::color::GradientPalette palette({
-        {0.0, {0.0, 0.0, 0.0}},
-        {1.0, {1.0, 1.0, 1.0}},
-    }, qrp::color::ToneSettings{0.0, 1.0, 0.0, 0.0, 2, 0.10});
-    require(
-        palette.sample(-2.0) == palette.sample(-0.3),
-        "posterization must create a stable lower plateau");
-    require(
-        palette.sample(2.0) == palette.sample(0.3),
-        "posterization must create a stable upper plateau");
-
-    bool rejectedSingleLevel = false;
-    try {
-        const qrp::color::GradientPalette invalid({
-            {0.0, {0.0, 0.0, 0.0}},
-            {1.0, {1.0, 1.0, 1.0}},
-        }, qrp::color::ToneSettings{0.0, 1.0, 0.0, 0.0, 1, 0.10});
-        static_cast<void>(invalid);
-    } catch (const std::invalid_argument&) {
-        rejectedSingleLevel = true;
-    }
-    require(rejectedSingleLevel, "a one-level posterization must be rejected");
 }
 
 void testMeasuredSeams() {
@@ -335,18 +247,6 @@ void testProjectDraftCommitTransaction() {
 
     project.resetDraft();
     require(!project.isDirty(), "Reset Draft must restore committed parameters");
-
-    project.draft().generator.scalarProfile
-        = static_cast<qrp::generators::ScalarProfile>(99);
-    const auto invalidProfile = project.applyDraft();
-    require(!invalidProfile.applied, "unknown scalar profiles must be rejected");
-    require(project.committed() == committed, "invalid profiles must preserve committed state");
-
-    project.resetDraft();
-    project.draft().generator.cellularScale = 0.0;
-    const auto invalidCellularScale = project.applyDraft();
-    require(!invalidCellularScale.applied, "zero cellular scale must be rejected");
-    require(project.committed() == committed, "invalid cellular scale must preserve committed state");
 }
 
 void testMaterialSettingsCommitAtomically() {
@@ -409,48 +309,10 @@ void testProjectMetadataIsCompleteAndStable() {
     require(json.find("\"width\": 2880") != std::string::npos, "metadata needs width");
     require(json.find("\"interpolation\": \"Oklab\"") != std::string::npos, "metadata needs color semantics");
     require(json.find("\"seedHex\": \"0x") != std::string::npos, "metadata needs an exact seed");
-    require(json.find("\"model\": \"hybrid_torus_v4\"") != std::string::npos, "metadata needs generator semantics");
-    require(json.find("\"scalarProfile\": \"natural\"") != std::string::npos, "metadata needs scalar profile");
-    require(json.find("\"worldDetailAmplitude\"") != std::string::npos, "metadata needs world detail");
-    require(json.find("\"worldGrainAmplitude\"") != std::string::npos, "metadata needs world grain");
-    require(json.find("\"cellularScale\"") != std::string::npos, "metadata needs cellular scale");
-    require(json.find("\"edgeStructureAmplitude\"") != std::string::npos, "metadata needs edge structure");
-    require(json.find("\"posterizeLevels\"") != std::string::npos, "metadata needs posterization");
+    require(json.find("\"model\": \"hybrid_torus_v1\"") != std::string::npos, "metadata needs generator semantics");
     require(json.find("\"fourierModes\"") != std::string::npos, "metadata needs Fourier basis data");
     require(json.find("\"periodicNoise\"") != std::string::npos, "metadata needs noise basis data");
     require(json.find("\"material\"") != std::string::npos, "metadata needs material settings");
-}
-
-void testStylePresetsChangeStructureNotOnlyColor() {
-    const auto presets = qrp::presets::createBaselinePresets();
-    require(presets.size() == 8, "the preset suite must contain eight baselines");
-    const auto& screenprint = presets.at(5);
-    const auto& ink = presets.at(6);
-    const auto& cells = presets.at(7);
-    require(
-        screenprint.generator.scalarProfile == qrp::generators::ScalarProfile::Ridges,
-        "graphic screenprint must use the ridged scalar profile");
-    require(
-        screenprint.palette.tone().posterizeLevels == 4,
-        "graphic screenprint must use a finite four-color treatment");
-    require(
-        ink.generator.edgeStructureAmplitude
-            > 5.0 * (ink.generator.noiseWeight + ink.generator.fourierWeight),
-        "ink wash must be structurally Wang-edge-dominant");
-    require(
-        ink.generator.worldGrainAmplitude > 0.0,
-        "ink wash must carry cross-tile world grain");
-    require(
-        ink.generator.edgeStructureAmplitude > 0.0,
-        "ink wash must expose its Wang-edge structure");
-    require(
-        cells.generator.scalarProfile == qrp::generators::ScalarProfile::Cells,
-        "cellular camo must use the cellular scalar profile");
-    require(
-        screenprint.material.contourStrength == 0.0
-            && ink.material.contourStrength == 0.0
-            && cells.material.contourStrength == 0.0,
-        "new styles must not inherit the original contour language");
 }
 
 } // namespace
@@ -459,18 +321,14 @@ int main() {
     const std::vector<TestCase> tests{
         {"torus generator periodicity", testTorusGeneratorsArePeriodic},
         {"tile variation boundary", testTileVariationVanishesOnBoundary},
-        {"scalar profile boundaries", testScalarProfilesPreserveBoundaryContinuity},
-        {"edge ink shared boundaries", testEdgeConnectedInkMatchesAcrossSharedEdges},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
-        {"posterized palette plateaus", testPosterizedPaletteUsesStablePlateaus},
         {"measured seams", testMeasuredSeams},
         {"CPU reference render", testCpuReferenceRender},
         {"project draft/commit transaction", testProjectDraftCommitTransaction},
         {"material settings transaction", testMaterialSettingsCommitAtomically},
         {"PNG sRGB metadata", testPngEncodingCarriesSrgbMetadata},
         {"project export metadata", testProjectMetadataIsCompleteAndStable},
-        {"structurally distinct style presets", testStylePresetsChangeStructureNotOnlyColor},
     };
 
     int failures = 0;

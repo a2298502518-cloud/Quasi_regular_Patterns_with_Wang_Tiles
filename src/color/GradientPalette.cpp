@@ -108,12 +108,7 @@ GradientPalette::GradientPalette(
         || tone_.bandFrequency < 0.0
         || !std::isfinite(tone_.bandStrength)
         || tone_.bandStrength < 0.0
-        || tone_.bandStrength > 1.0
-        || tone_.posterizeLevels == 1U
-        || tone_.posterizeLevels > 8U
-        || !std::isfinite(tone_.posterizeSoftness)
-        || tone_.posterizeSoftness <= 0.0
-        || tone_.posterizeSoftness >= 0.5) {
+        || tone_.bandStrength > 1.0) {
         throw std::invalid_argument("Invalid gradient palette settings.");
     }
 
@@ -171,37 +166,6 @@ GradientPalette GradientPalette::createAurora() {
     }, ToneSettings{0.0, 1.95, 7.0, 0.12});
 }
 
-GradientPalette GradientPalette::createGraphicPrimary() {
-    return GradientPalette({
-        {0.00, linearRgbFromSrgb8(10, 20, 38)},
-        {1.0 / 3.0, linearRgbFromSrgb8(24, 62, 105)},
-        {2.0 / 3.0, linearRgbFromSrgb8(239, 229, 198)},
-        {1.00, linearRgbFromSrgb8(222, 67, 43)},
-    }, ToneSettings{0.0, 1.80, 0.0, 0.0, 4, 0.14});
-}
-
-GradientPalette GradientPalette::createInkWash() {
-    return GradientPalette({
-        {0.00, linearRgbFromSrgb8(9, 15, 20)},
-        {0.22, linearRgbFromSrgb8(31, 43, 50)},
-        {0.46, linearRgbFromSrgb8(86, 101, 105)},
-        {0.70, linearRgbFromSrgb8(174, 177, 167)},
-        {0.88, linearRgbFromSrgb8(224, 219, 203)},
-        {1.00, linearRgbFromSrgb8(247, 242, 226)},
-    }, ToneSettings{0.0, 1.25, 0.0, 0.0});
-}
-
-GradientPalette GradientPalette::createFieldCamo() {
-    return GradientPalette({
-        {0.00, linearRgbFromSrgb8(18, 38, 24)},
-        {0.24, linearRgbFromSrgb8(48, 78, 52)},
-        {0.43, linearRgbFromSrgb8(101, 107, 78)},
-        {0.61, linearRgbFromSrgb8(181, 164, 108)},
-        {0.78, linearRgbFromSrgb8(211, 181, 126)},
-        {1.00, linearRgbFromSrgb8(82, 54, 36)},
-    }, ToneSettings{0.02, 1.90, 0.0, 0.0});
-}
-
 const std::vector<ColorStop>& GradientPalette::stops() const noexcept {
     return stops_;
 }
@@ -219,19 +183,6 @@ Color3 GradientPalette::sample(const double scalar) const noexcept {
             + tone_.bandStrength * band;
     }
     coordinate = std::clamp(coordinate, 0.0, 1.0);
-    if (tone_.posterizeLevels >= 2U) {
-        const double intervals = static_cast<double>(tone_.posterizeLevels - 1U);
-        const double scaled = coordinate * intervals;
-        const double lower = std::min(std::floor(scaled), intervals - 1.0);
-        const double fraction = scaled - lower;
-        const double transition = std::clamp(
-            (fraction - (0.5 - tone_.posterizeSoftness))
-                / (2.0 * tone_.posterizeSoftness),
-            0.0,
-            1.0);
-        // 有限宽度的平滑阶跃保留丝网印刷的色块，同时避免采样锯齿。
-        coordinate = (lower + smoothstep(transition)) / intervals;
-    }
 
     auto upper = std::upper_bound(
         stops_.begin(),

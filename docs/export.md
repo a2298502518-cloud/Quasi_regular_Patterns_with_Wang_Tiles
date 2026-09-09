@@ -52,8 +52,7 @@ JSON 的 `schemaVersion` 当前为 1，记录：
 - 项目名与 committed revision；
 - 输出尺寸、材质开关和相机；
 - Wang 网格、基础每瓦片像素数与无精度损失的十六进制 64 位种子；
-- 全部边函数、`hybrid_torus_v2` 语义版本、scalar profile、连续世界场、Fourier modes、
-  周期噪声种子与混合参数；
+- 全部边函数、生成器语义版本、Fourier modes、周期噪声种子与混合参数；
 - Oklab 插值语义、tone、线性 RGB 与 sRGB 色标；
 - 轮廓和浮雕材质参数。
 

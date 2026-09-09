@@ -22,9 +22,7 @@ ctest --test-dir build -C Release --output-on-failure
 ## 3. 固定基线
 
 生成器设置的列依次为 Fourier 权重、噪声权重、瓦片标量变化、瓦片域扰动、世界标量
-调制、世界域扰动、世界频率 X/Y、连续世界细节、scalar profile、世界颗粒、胞元尺度和
-Wang 边结构振幅。代码中的
-`PatternPreset` 是权威快照，
+调制、世界域扰动、世界频率 X、世界频率 Y。代码中的 `PatternPreset` 是权威快照，
 CPU 与 GPU 应用共同使用它。
 
 | 名称 | 网格 | 像素/瓦片 | Wang 种子 | 生成器设置 | 调色板 |
@@ -34,9 +32,6 @@ CPU 与 GPU 应用共同使用它。
 | `tiling_qrp_10x10` | 10 x 10 | 72 | `0xdecafbad98765432` | `1.05, .15, .05, .025, .32, .38, .167, .123` | Midnight Gold |
 | `tiling_mineral_10x10` | 10 x 10 | 72 | `0xa17e5c4962bd308f` | `.34, 1.18, .05, .025, .35, .42, .173, -.127` | Mineral |
 | `tiling_aurora_10x10` | 10 x 10 | 72 | `0x6712e4ad09bc53f8` | `.70, .68, .05, .025, .35, .40, -.151, .113` | Aurora |
-| `tiling_graphic_screenprint_10x10` | 10 x 10 | 72 | `0x4d3c2b1a90e8f765` | `.08, 0, .003, .003, .42, .08, .110, .037, .40, ridges, 0, .75, 0` | Graphic Primary |
-| `tiling_ink_wash_10x10` | 10 x 10 | 72 | `0x83c6a91e25d74bf0` | `.03, .08, .010, .020, .015, .06, .072, -.049, .10, natural, .055, .75, .95` | Ink Wash |
-| `tiling_cellular_camo_10x10` | 10 x 10 | 72 | `0x29f14ac783b650de` | `.08, .05, .005, .005, .04, .10, .130, .083, .18, cells, .02, .70, 0` | Field Camo |
 
 ## 4. 阶段 B 验证结果
 

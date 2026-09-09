@@ -107,7 +107,6 @@ struct EvaluatedSample {
         inverse.parameter,
         world,
         tile.seed,
-        {tile.south, tile.north, tile.west, tile.east},
     });
     return {true, scalar, colorPalette.sample(scalar)};
 }
@@ -173,7 +172,6 @@ CpuRenderResult CpuReferenceRenderer::render(
                 inverse.parameter,
                 math::Vec2{worldX, worldY},
                 tile.seed,
-                {tile.south, tile.north, tile.west, tile.east},
             });
             result.image.pixel(pixelX, pixelY) = quantize(colorPalette.sample(scalar));
         }

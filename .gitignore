@@ -18,6 +18,11 @@ compile_commands.json
 /.cache/
 *.log
 
+# Local research library
+# Third-party PDFs are kept for personal research and are not redistributed
+# through the public repository. Bibliographic metadata and reading notes remain tracked.
+/references/papers/*.pdf
+
 # Compiled artifacts
 *.obj
 *.o

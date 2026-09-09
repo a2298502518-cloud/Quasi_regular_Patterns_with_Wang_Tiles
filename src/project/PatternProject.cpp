@@ -19,7 +19,7 @@ namespace {
     return result;
 }
 
-[[nodiscard]] bool validGenerator(
+[[nodiscard]] bool finiteGenerator(
     const generators::HybridGeneratorSettings& settings) noexcept {
     return std::isfinite(settings.fourierWeight)
         && std::isfinite(settings.noiseWeight)
@@ -28,16 +28,7 @@ namespace {
         && std::isfinite(settings.worldModulationAmplitude)
         && std::isfinite(settings.worldDomainWarpAmplitude)
         && std::isfinite(settings.worldFrequencyX)
-        && std::isfinite(settings.worldFrequencyY)
-        && std::isfinite(settings.worldDetailAmplitude)
-        && std::isfinite(settings.worldGrainAmplitude)
-        && std::isfinite(settings.cellularScale)
-        && settings.cellularScale > 0.0
-        && settings.cellularScale <= 4.0
-        && std::isfinite(settings.edgeStructureAmplitude)
-        && settings.edgeStructureAmplitude >= 0.0
-        && settings.edgeStructureAmplitude <= 2.0
-        && generators::isValid(settings.scalarProfile);
+        && std::isfinite(settings.worldFrequencyY);
 }
 
 [[nodiscard]] PatternScene placeholderScene() {
@@ -163,8 +154,8 @@ std::pair<std::optional<PatternScene>, ApplyResult> PatternProject::buildScene(
         result.message = "The color ramp must contain 2..8 stops.";
         return {std::nullopt, result};
     }
-    if (!validGenerator(configuration.generator)) {
-        result.message = "Generator settings must be finite and use a recognized profile.";
+    if (!finiteGenerator(configuration.generator)) {
+        result.message = "Generator settings must be finite.";
         return {std::nullopt, result};
     }
     if (!color::isValid(configuration.material)) {

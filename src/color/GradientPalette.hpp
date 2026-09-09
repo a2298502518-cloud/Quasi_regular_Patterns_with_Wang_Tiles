@@ -25,8 +25,6 @@ struct ToneSettings {
     double contrast = 1.8;
     double bandFrequency = 0.0;
     double bandStrength = 0.0;
-    std::uint32_t posterizeLevels = 0;
-    double posterizeSoftness = 0.12;
 
     [[nodiscard]] bool operator==(const ToneSettings&) const noexcept = default;
 };
@@ -38,9 +36,6 @@ public:
     [[nodiscard]] static GradientPalette createMidnightGold();
     [[nodiscard]] static GradientPalette createMineral();
     [[nodiscard]] static GradientPalette createAurora();
-    [[nodiscard]] static GradientPalette createGraphicPrimary();
-    [[nodiscard]] static GradientPalette createInkWash();
-    [[nodiscard]] static GradientPalette createFieldCamo();
 
     [[nodiscard]] const std::vector<ColorStop>& stops() const noexcept;
     [[nodiscard]] const ToneSettings& tone() const noexcept;
