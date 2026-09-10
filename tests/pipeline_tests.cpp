@@ -124,6 +124,93 @@ void testTileVariationVanishesOnBoundary() {
     }
 }
 
+void testPaperCoreCanDisableTileSeedVariation() {
+    HybridGeneratorSettings settings;
+    settings.fourierWeight = 1.0;
+    settings.noiseWeight = 0.0;
+    settings.tileVariationAmplitude = 0.0;
+    settings.tileDomainWarpAmplitude = 0.0;
+    settings.worldModulationAmplitude = 0.0;
+    settings.worldDomainWarpAmplitude = 0.0;
+    settings.worldFrequencyX = 0.0;
+    settings.worldFrequencyY = 0.0;
+    const auto generator = createGenerator(settings);
+
+    constexpr std::uint64_t firstSeed = 17;
+    constexpr std::uint64_t secondSeed = 0xcafef00d12345678ULL;
+    for (int y = 0; y <= 40; ++y) {
+        for (int x = 0; x <= 40; ++x) {
+            const Vec2 parameter{
+                static_cast<double>(x) / 40.0,
+                static_cast<double>(y) / 40.0,
+            };
+            const double expected = generator.evaluateBase(parameter);
+            requireNear(
+                generator.evaluate(GeneratorInput{
+                    parameter,
+                    Vec2{8.0 + parameter.x, 3.0 + parameter.y},
+                    firstSeed,
+                }),
+                expected,
+                0.0,
+                "paper-core base-field isolation");
+            requireNear(
+                generator.evaluate(GeneratorInput{
+                    parameter,
+                    Vec2{-4.0 + parameter.x, 11.0 + parameter.y},
+                    secondSeed,
+                }),
+                expected,
+                0.0,
+                "paper-core world/seed independence");
+        }
+    }
+
+    const qrp::model::EdgePalette identityEdges({
+        qrp::math::EdgeFunction(qrp::math::EdgeParameters{0.0, 0.0}),
+    });
+    const qrp::model::WangGrid firstGrid(3, 2, 1, 0x1234567812345678ULL);
+    const qrp::model::WangGrid secondGrid(3, 2, 1, 0x8765432187654321ULL);
+    bool observedDifferentTileSeed = false;
+    for (std::size_t index = 0; index < firstGrid.tiles().size(); ++index) {
+        if (firstGrid.tiles()[index].seed != secondGrid.tiles()[index].seed) {
+            observedDifferentTileSeed = true;
+            break;
+        }
+    }
+    require(observedDifferentTileSeed, "control grids must carry different tile seeds");
+
+    const auto colorPalette = qrp::color::GradientPalette::createMidnightGold();
+    const auto firstRender = qrp::render::CpuReferenceRenderer::render(
+        firstGrid,
+        identityEdges,
+        generator,
+        colorPalette,
+        qrp::render::CpuRenderSettings{16, {}});
+    const auto secondRender = qrp::render::CpuReferenceRenderer::render(
+        secondGrid,
+        identityEdges,
+        generator,
+        colorPalette,
+        qrp::render::CpuRenderSettings{16, {}});
+    require(
+        firstRender.diagnostics.inverseFailureCount == 0
+            && secondRender.diagnostics.inverseFailureCount == 0,
+        "tile-seed control renders must complete every inverse solve");
+    require(
+        firstRender.image.pixels().size() == secondRender.image.pixels().size(),
+        "tile-seed control images must have matching dimensions");
+    for (std::size_t index = 0; index < firstRender.image.pixels().size(); ++index) {
+        const auto first = firstRender.image.pixels()[index];
+        const auto second = secondRender.image.pixels()[index];
+        require(
+            first.red == second.red
+                && first.green == second.green
+                && first.blue == second.blue,
+            "tile seeds must not affect the rendered paper-core image");
+    }
+}
+
 void testGradientPalettesStayFiniteAndBounded() {
     const std::vector<qrp::color::GradientPalette> palettes{
         qrp::color::GradientPalette::createMidnightGold(),
@@ -321,6 +408,7 @@ int main() {
     const std::vector<TestCase> tests{
         {"torus generator periodicity", testTorusGeneratorsArePeriodic},
         {"tile variation boundary", testTileVariationVanishesOnBoundary},
+        {"paper-core tile seed independence", testPaperCoreCanDisableTileSeedVariation},
         {"gradient palette range", testGradientPalettesStayFiniteAndBounded},
         {"perceptual palette interpolation", testPaletteUsesPerceptualInterpolation},
         {"measured seams", testMeasuredSeams},

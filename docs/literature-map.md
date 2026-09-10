@@ -36,6 +36,7 @@
 | 文献概念 | 项目位置 | 当前判断 | 后续证据 |
 | --- | --- | --- | --- |
 | 边标签匹配 | `src/model/WangGrid.*` | 已实现随机合法网格 | 固定种子、邻边相等与选择分布测试 |
+| 经典有限图像 tile 对照 | `src/atlas/*` | 独立实现 8-tile 偶校验集合、约束选片与直接拼接 | 候选数、可复现性、方向和逐像素接缝测试 |
 | 边标签对应边函数 | `src/model/EdgePalette.*`、`src/math/EdgeFunction.*` | 属于本地论文扩展，不是经典 Wang Tile 的通用定义 | 每种颜色的函数图、端点和单调性表 |
 | 四边 Coons warp | `src/math/CoonsWarp.*` | 已实现，但全局可逆性不能只由单边单调推出 | 组合 Jacobian 下界、稠密采样和逆映射残差 |
 | 逆映射后采样生成器 | `src/render/CpuReferenceRenderer.cpp`、`shaders/wang_pattern.frag` | 是论文核心管线 | identity/warped 对照图与 CPU/GPU 分阶段误差 |
@@ -81,7 +82,16 @@
 对照组。此决定不应只根据画面是否美观作出。
 
 第一轮精读与实现审计已经完成，详细结论见
-[主论文与当前实现审计](./paper-implementation-audit.md)。当前决策是移除此前新增的预设
-6–8 及其专用路径，保留预设 1–5 与主论文核心管线。下一轮新风格将从
-“边标签—Coons 逆映射—周期生成器”内部重新设计，并以 Wang 因果消融、接缝验证和
-CPU/GPU 一致性作为进入正式预设的条件。
+[主论文与当前实现审计](./paper-implementation-audit.md)。此前新增的预设 6–8、只替换
+公共母纹的 `FlowingRibbon`，以及用边签名和 tile seed 驱动随机相位的
+`StructuredBankV1` 均已拒绝。最后一种方案虽然保持接缝连续，却让逐 tile 内部变化
+成为主要视觉来源，不能作为主论文算法成立的证据。
+
+当前只保留预设 1–5 与主论文核心管线。独立的 `qrp_paper_core_audit` 已在关闭全部可选
+内部扰动后，固定输出恒等边函数、标签统一映射、真实 Wang 标签及标签覆盖图。结果确认
+边标签与 Coons 逆映射使结果不再满足单 tile 平移重复，但不足以消除公共母纹的周期拓扑；
+下一步应讨论主论文中的内容构造定义，而不是继续叠加与边标签关系不清的随机项。
+公开项目 `sashaouellet/WangTile` 只作为 atlas/image quilting 路线的工程对照与设计启发。
+本项目已独立加入有限 8-tile 集合、扫描线约束选片和直接图像拼接的经典基线，但没有
+复制其代码、图片、手写表或经验常数；其 patch quilting 与旋转裁剪仍未实现。基线的
+定义、边界和运行方式见 [经典图像 Wang Tile 对照基线](./classic-wang-reference.md)。

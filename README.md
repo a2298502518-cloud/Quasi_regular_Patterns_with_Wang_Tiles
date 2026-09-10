@@ -19,6 +19,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - [交互编辑器与提交语义](./docs/interactive-editor.md)
 - [PNG 与参数导出](./docs/export.md)
 - [主论文与当前实现审计](./docs/paper-implementation-audit.md)
+- [经典图像 Wang Tile 对照基线](./docs/classic-wang-reference.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 - 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
 - 单瓦片、2 x 2 与三套 10 x 10 固定种子展示预设，以及独立接缝误差热图
@@ -61,6 +62,12 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 当前构建产生 CPU 参考工具、测试程序和带参数面板的 GPU 实时桌面应用。
+
+生成独立的经典 8-tile 图像 atlas 对照（不进入正式预设）：
+
+```powershell
+.\build\Release\qrp_classic_wang_reference.exe output\classic-wang-reference
+```
 
 运行实时程序：
 

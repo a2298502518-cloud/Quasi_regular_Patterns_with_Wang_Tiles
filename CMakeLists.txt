@@ -141,6 +141,19 @@ target_link_libraries(qrp_render
 )
 target_compile_features(qrp_render PUBLIC cxx_std_20)
 
+add_library(qrp_atlas STATIC
+    src/atlas/AtlasRenderer.cpp
+    src/atlas/WangAtlasTiling.cpp
+    src/atlas/WangTileAtlas.cpp
+)
+
+target_link_libraries(qrp_atlas
+    PUBLIC
+        qrp_model
+        qrp_render
+)
+target_compile_features(qrp_atlas PUBLIC cxx_std_20)
+
 add_library(qrp_export STATIC
     src/export/PngWriter.cpp
     src/export/PpmWriter.cpp
@@ -161,6 +174,20 @@ add_executable(qrp_cpu_reference
 
 target_link_libraries(qrp_cpu_reference PRIVATE qrp_export qrp_presets qrp_render)
 target_compile_features(qrp_cpu_reference PRIVATE cxx_std_20)
+
+add_executable(qrp_paper_core_audit
+    apps/paper_core_audit_main.cpp
+)
+
+target_link_libraries(qrp_paper_core_audit PRIVATE qrp_export qrp_render)
+target_compile_features(qrp_paper_core_audit PRIVATE cxx_std_20)
+
+add_executable(qrp_classic_wang_reference
+    apps/classic_wang_reference_main.cpp
+)
+
+target_link_libraries(qrp_classic_wang_reference PRIVATE qrp_atlas qrp_export)
+target_compile_features(qrp_classic_wang_reference PRIVATE cxx_std_20)
 
 if(QRP_BUILD_REALTIME)
     add_library(qrp_opengl STATIC
@@ -229,8 +256,11 @@ foreach(target
     qrp_presets
     qrp_project
     qrp_render
+    qrp_atlas
     qrp_export
     qrp_cpu_reference
+    qrp_paper_core_audit
+    qrp_classic_wang_reference
 )
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
