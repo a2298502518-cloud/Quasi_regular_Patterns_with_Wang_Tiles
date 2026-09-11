@@ -200,6 +200,13 @@ add_executable(qrp_wang_texture_atlas
 target_link_libraries(qrp_wang_texture_atlas PRIVATE qrp_atlas qrp_export)
 target_compile_features(qrp_wang_texture_atlas PRIVATE cxx_std_20)
 
+add_executable(qrp_wang_qrp_ablation
+    apps/wang_qrp_ablation_main.cpp
+)
+
+target_link_libraries(qrp_wang_qrp_ablation PRIVATE qrp_atlas qrp_export)
+target_compile_features(qrp_wang_qrp_ablation PRIVATE cxx_std_20)
+
 if(QRP_BUILD_REALTIME)
     add_library(qrp_opengl STATIC
         src/render/opengl/GpuPatternRenderer.cpp
@@ -273,6 +280,7 @@ foreach(target
     qrp_paper_core_audit
     qrp_classic_wang_reference
     qrp_wang_texture_atlas
+    qrp_wang_qrp_ablation
 )
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)

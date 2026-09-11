@@ -130,6 +130,31 @@ A_{\sigma_L}(1,t)=A_{\sigma_R}(0,t).
 集成，不修改主论文方法。只有这组三图给出清楚的正面证据后，才讨论 18-tile、角点
 编码、GPU atlas、交互参数和正式视觉预设。
 
+### 6.1 首轮 CPU 结果
+
+独立程序 `qrp_wang_qrp_ablation` 已按上述三组对照实现。程序从固定的五方向 QRP
+标量场中选择四个样本，经 minimum-error quilting 构造 8 张二边色 Wang tile；三组
+图像不使用 tile seed、噪声、世界场或额外随机相位。复现命令为：
+
+```powershell
+cmake --build build --config Release --target qrp_wang_qrp_ablation
+.\build\Release\qrp_wang_qrp_ablation.exe output\wang-qrp-ablation
+```
+
+2026-09-11 的固定 `10 x 10`、每 tile 96 像素结果如下。平移差是相隔一个 tile 后的
+归一化平均 RGB 差，只作为重复性诊断，不作为非周期性的数学证明。
+
+| 组别 | 水平单 tile 平移差 | 垂直单 tile 平移差 | 最大 8-bit 接缝差 |
+| --- | ---: | ---: | ---: |
+| A：公共 QRP + Coons | `0.0940181` | `0.0782012` | `0` |
+| B：Wang 条件内容 + 恒等映射 | `0.156773` | `0.141694` | `0` |
+| C：Wang 条件内容 + Coons | `0.183745` | `0.167028` | `0` |
+
+三组固定输入均逐像素可复现，所有接缝求值均无逆映射失败。B/C 相对 A 的单 tile
+平移差明显增加，说明 Wang 条件内容确实削弱了公共母纹的直接重复；但视觉上仍能辨认
+出有限 8-tile 字典中的重复构件。该结果支持继续研究内容 atlas，但尚不足以把候选方法
+并入正式预设或写成主论文结论。
+
 ## 7. 候选贡献的表述边界
 
 现阶段可以讨论的研究问题是：由 QRP 场生成的 Wang 条件内容与边函数驱动的 Coons

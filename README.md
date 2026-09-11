@@ -31,6 +31,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
 - 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
 - 由四张受控样本、最小误差拼接和 45 度旋转裁剪确定性构造的 8-tile 纹理 atlas 实验
+- 将 QRP 源场构造成 Wang 条件内容，并与公共母纹、Coons 组合进行三组 CPU 消融的独立实验
 
 本地主论文是研究工作的主体，`docs/math-spec.md` 是与论文同步维护的实现契约。外部
 论文只用于理论借鉴、术语澄清和相关工作比较，不作为本项目的独立复现目标。
@@ -77,6 +78,12 @@ ctest --test-dir build -C Release --output-on-failure
 
 ```powershell
 .\build\Release\qrp_wang_texture_atlas.exe output\wang-texture-atlas
+```
+
+生成 Wang 条件 QRP 内容的三组 CPU 消融图（不进入正式预设）：
+
+```powershell
+.\build\Release\qrp_wang_qrp_ablation.exe output\wang-qrp-ablation
 ```
 
 运行实时程序：
