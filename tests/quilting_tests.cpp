@@ -1161,6 +1161,101 @@ void testAsymmetricAtlasParityProvenanceAndCompatibility() {
     require(legalMacroBlocks != 0, "the corner audit must enumerate legal 2x2 macro-blocks");
 }
 
+void testCompleteCartesianAtlas() {
+    const auto samples = asymmetricSampleBank();
+    const auto minimal =
+        qrp::atlas::WangTextureAtlasBuilder::buildMinimalEight(
+            samples,
+            buildOptions());
+    const auto result =
+        qrp::atlas::WangTextureAtlasBuilder::buildCompleteSixteen(
+            samples,
+            buildOptions());
+    const auto coverage = result.atlas.coverage();
+    require(coverage.complete, "complete atlas must cover every binary edge signature");
+    require(
+        coverage.tileCount == 16
+            && coverage.signatureCount == 16
+            && coverage.expectedSignatureCount == 16,
+        "complete binary atlas must contain sixteen unique signatures");
+    require(
+        result.report.independentCutCount == 64
+            && result.report.independentCutPixelCount == 64 * kPatchSize,
+        "complete atlas report must contain four cuts per signature");
+    for (std::size_t first = 0; first < result.atlas.tiles().size(); ++first) {
+        for (std::size_t second = first + 1;
+             second < result.atlas.tiles().size();
+             ++second) {
+            require(
+                !imagesEqual(
+                    result.atlas.tiles()[first].image,
+                    result.atlas.tiles()[second].image),
+                "complete atlas signatures must produce distinct tile images");
+        }
+    }
+    for (const auto& minimalTile : minimal.atlas.tiles()) {
+        require(
+            imagesEqual(
+                minimalTile.image,
+                result.atlas.select(minimalTile.edges).image),
+            "complete atlas must leave the eight shared signature images unchanged");
+    }
+
+    for (std::uint32_t north = 0; north < 2; ++north) {
+        for (std::uint32_t east = 0; east < 2; ++east) {
+            for (std::uint32_t south = 0; south < 2; ++south) {
+                for (std::uint32_t west = 0; west < 2; ++west) {
+                    const auto edges =
+                        qrp::atlas::WangEdgeSignature::fromNorthEastSouthWest(
+                            north,
+                            east,
+                            south,
+                            west);
+                    require(
+                        result.atlas.select(edges).edges == edges,
+                        "complete atlas lookup must preserve every signature");
+                }
+            }
+        }
+    }
+    for (std::uint32_t south = 0; south < 2; ++south) {
+        for (std::uint32_t west = 0; west < 2; ++west) {
+            std::size_t candidateCount = 0;
+            for (const auto& tile : result.atlas.tiles()) {
+                candidateCount += tile.edges.south == south
+                    && tile.edges.west == west;
+            }
+            require(
+                candidateCount == 4,
+                "complete atlas must offer four candidates for every south/west pair");
+        }
+    }
+
+    const auto compatibility =
+        qrp::atlas::AtlasRenderer::measureAtlasCompatibility(result.atlas);
+    require(
+        compatibility.sampleCount == 256 * kOutputResolution,
+        "complete atlas audit must sample all compatible ordered boundaries");
+    require(
+        compatibility.mismatchedPixelCount == 0
+            && compatibility.maximumChannelDifference == 0,
+        "complete atlas boundaries must remain bit-exact");
+
+    const qrp::atlas::WangAtlasTiling tiling(
+        11,
+        7,
+        result.atlas,
+        0x6a09e667f3bcc909ULL);
+    const auto renderedSeams = qrp::atlas::AtlasRenderer::measureSeams(
+        tiling,
+        result.atlas);
+    require(tiling.hasValidAdjacency(), "complete atlas tiling must satisfy Wang adjacency");
+    require(
+        renderedSeams.mismatchedPixelCount == 0
+            && renderedSeams.maximumChannelDifference == 0,
+        "complete atlas tiling must render with bit-exact boundaries");
+}
+
 void testAtlasDeterminismAndDebugOptIn() {
     const auto samples = asymmetricSampleBank();
     const auto first = qrp::atlas::WangTextureAtlasBuilder::buildMinimalEight(
@@ -1440,6 +1535,7 @@ int main() {
         {"L-shaped overlap ownership", testLShapedOverlapOwnership},
         {"high-contrast corner diagnostics", testBoundaryDiagnosticsExposeHighContrastCornerConflict},
         {"asymmetric atlas parity and provenance", testAsymmetricAtlasParityProvenanceAndCompatibility},
+        {"complete Cartesian atlas", testCompleteCartesianAtlas},
         {"atlas determinism and debug opt-in", testAtlasDeterminismAndDebugOptIn},
         {"atlas source causality", testAtlasSourceCausality},
         {"multiple tiling seeds and rendered seams", testMultipleTilingSeedsAndRenderedSeams},

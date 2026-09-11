@@ -30,8 +30,8 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
 - 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
-- 由四张受控样本、最小误差拼接和 45 度旋转裁剪确定性构造的 8-tile 纹理 atlas 实验
-- 将 QRP 源场构造成 Wang 条件内容，并与公共母纹、Coons 组合进行三组 CPU 消融的独立实验
+- 由四张受控样本、最小误差拼接和 45 度旋转裁剪确定性构造的 S8/S16 纹理 atlas 实验
+- 将 QRP 源场构造成 Wang 条件内容，完成四组 CPU 因果消融及 S8/S16 结构化字典对照
 
 本地主论文是研究工作的主体，`docs/math-spec.md` 是与论文同步维护的实现契约。外部
 论文只用于理论借鉴、术语澄清和相关工作比较，不作为本项目的独立复现目标。
@@ -80,10 +80,13 @@ ctest --test-dir build -C Release --output-on-failure
 .\build\Release\qrp_wang_texture_atlas.exe output\wang-texture-atlas
 ```
 
-生成 Wang 条件 QRP 内容的三组 CPU 消融图（不进入正式预设）：
+生成 Wang 条件 QRP 内容的四组 CPU 消融图与 S8/S16 字典对照（不进入正式预设）。
+`primary` 是首轮固定配置，`holdout` 会同时更换 QRP 相位、样本搜索 seed 和 Wang
+网格 seed，用于独立复现检查：
 
 ```powershell
-.\build\Release\qrp_wang_qrp_ablation.exe output\wang-qrp-ablation
+.\build\Release\qrp_wang_qrp_ablation.exe output\wang-qrp-ablation primary
+.\build\Release\qrp_wang_qrp_ablation.exe output\wang-qrp-ablation-holdout holdout
 ```
 
 运行实时程序：

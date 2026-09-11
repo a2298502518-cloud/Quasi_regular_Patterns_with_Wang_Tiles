@@ -33,10 +33,30 @@ constexpr std::size_t kOverlapPixels = 32;
 constexpr std::size_t kPixelsPerTile = 96;
 constexpr std::size_t kGridWidth = 10;
 constexpr std::size_t kGridHeight = 10;
+constexpr std::size_t kShiftLagCount = 5;
 constexpr std::size_t kCandidateGroupCount = 96;
 constexpr std::size_t kMinimumOriginDistancePixels = 112;
-constexpr std::uint64_t kSampleSearchSeed = 0x243f6a8885a308d3ULL;
-constexpr std::uint64_t kGridSeed = 0x13198a2e03707344ULL;
+
+struct ExperimentConfig {
+    std::string_view id;
+    std::array<double, 5> phases;
+    std::uint64_t sampleSearchSeed = 0;
+    std::uint64_t gridSeed = 0;
+};
+
+constexpr ExperimentConfig kPrimaryConfig{
+    "primary",
+    {0.17, 1.31, 2.46, 3.72, 5.09},
+    0x243f6a8885a308d3ULL,
+    0x13198a2e03707344ULL,
+};
+
+constexpr ExperimentConfig kHoldoutConfig{
+    "holdout",
+    {0.73, 2.02, 3.11, 4.28, 5.67},
+    0xa4093822299f31d0ULL,
+    0x082efa98ec4e6c89ULL,
+};
 
 struct ShiftDifference {
     double horizontal = 0.0;
@@ -53,22 +73,28 @@ struct SeamMetrics {
 struct RenderCase {
     qrp::render::Image image;
     SeamMetrics seams;
-    ShiftDifference oneTileShift;
+    std::array<ShiftDifference, kShiftLagCount> tileShifts{};
     bool reproducible = false;
+};
+
+struct SignatureUsageMetrics {
+    std::size_t uniqueSignatureCount = 0;
+    std::size_t maximumSignatureUseCount = 0;
+    double effectiveSignatureCount = 0.0;
+    std::array<ShiftDifference, kShiftLagCount> sameSignatureRates{};
+};
+
+enum class ContentSelection {
+    FixedZeroSignature,
+    WangSignature,
 };
 
 [[nodiscard]] double sampleQrpSource(
     const double x,
-    const double y) noexcept {
+    const double y,
+    const std::array<double, 5>& phases) noexcept {
     constexpr double tau = 2.0 * std::numbers::pi_v<double>;
     constexpr double cyclesPerPixel = 1.0 / 46.0;
-    constexpr std::array<double, 5> phases{{
-        0.17,
-        1.31,
-        2.46,
-        3.72,
-        5.09,
-    }};
 
     double sum = 0.0;
     for (std::size_t index = 0; index < phases.size(); ++index) {
@@ -103,13 +129,15 @@ struct RenderCase {
     return {channel(color.red), channel(color.green), channel(color.blue)};
 }
 
-[[nodiscard]] qrp::render::Image createQrpSource() {
+[[nodiscard]] qrp::render::Image createQrpSource(
+    const std::array<double, 5>& phases) {
     qrp::render::Image image(kSourceSize, kSourceSize);
     for (std::size_t y = 0; y < kSourceSize; ++y) {
         for (std::size_t x = 0; x < kSourceSize; ++x) {
             const std::uint8_t value = encodeScalar(sampleQrpSource(
                 static_cast<double>(x),
-                static_cast<double>(y)));
+                static_cast<double>(y),
+                phases));
             image.pixel(x, y) = {value, value, value};
         }
     }
@@ -210,12 +238,71 @@ struct RenderCase {
     return static_cast<double>(difference / (255.0L * channelCount));
 }
 
-[[nodiscard]] ShiftDifference measureOneTileShift(
+[[nodiscard]] std::array<ShiftDifference, kShiftLagCount> measureTileShifts(
     const qrp::render::Image& image) {
-    return {
-        meanShiftDifference(image, kPixelsPerTile, 0),
-        meanShiftDifference(image, 0, kPixelsPerTile),
-    };
+    std::array<ShiftDifference, kShiftLagCount> result{};
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        const std::size_t shift = (index + 1) * kPixelsPerTile;
+        result[index] = {
+            meanShiftDifference(image, shift, 0),
+            meanShiftDifference(image, 0, shift),
+        };
+    }
+    return result;
+}
+
+[[nodiscard]] std::size_t binarySignatureIndex(
+    const qrp::atlas::WangEdgeSignature edges) noexcept {
+    return static_cast<std::size_t>(
+        (edges.south << 3U)
+        | (edges.north << 2U)
+        | (edges.west << 1U)
+        | edges.east);
+}
+
+[[nodiscard]] SignatureUsageMetrics measureSignatureUsage(
+    const qrp::atlas::WangAtlasTiling& tiling) {
+    std::array<std::size_t, 16> counts{};
+    for (const auto edges : tiling.tiles()) {
+        ++counts.at(binarySignatureIndex(edges));
+    }
+
+    SignatureUsageMetrics result;
+    long double sumOfSquaredCounts = 0.0L;
+    for (const std::size_t count : counts) {
+        result.uniqueSignatureCount += count != 0;
+        result.maximumSignatureUseCount = std::max(
+            result.maximumSignatureUseCount,
+            count);
+        sumOfSquaredCounts += static_cast<long double>(count)
+            * static_cast<long double>(count);
+    }
+    const long double tileCount = static_cast<long double>(tiling.tiles().size());
+    result.effectiveSignatureCount = static_cast<double>(
+        tileCount * tileCount / sumOfSquaredCounts);
+
+    for (std::size_t index = 0; index < result.sameSignatureRates.size(); ++index) {
+        const std::size_t lag = index + 1;
+        std::size_t horizontalMatches = 0;
+        std::size_t verticalMatches = 0;
+        for (std::size_t y = 0; y < tiling.height(); ++y) {
+            for (std::size_t x = 0; x + lag < tiling.width(); ++x) {
+                horizontalMatches += tiling.tile(x, y) == tiling.tile(x + lag, y);
+            }
+        }
+        for (std::size_t y = 0; y + lag < tiling.height(); ++y) {
+            for (std::size_t x = 0; x < tiling.width(); ++x) {
+                verticalMatches += tiling.tile(x, y) == tiling.tile(x, y + lag);
+            }
+        }
+        result.sameSignatureRates[index] = {
+            static_cast<double>(horizontalMatches)
+                / static_cast<double>((tiling.width() - lag) * tiling.height()),
+            static_cast<double>(verticalMatches)
+                / static_cast<double>(tiling.width() * (tiling.height() - lag)),
+        };
+    }
+    return result;
 }
 
 [[nodiscard]] bool imagesEqual(
@@ -234,6 +321,21 @@ struct RenderCase {
         }
     }
     return true;
+}
+
+[[nodiscard]] std::size_t countUniqueTileImages(
+    const qrp::atlas::WangTileAtlas& atlas) {
+    std::size_t uniqueCount = 0;
+    for (std::size_t index = 0; index < atlas.tiles().size(); ++index) {
+        bool matchesEarlier = false;
+        for (std::size_t earlier = 0; earlier < index; ++earlier) {
+            matchesEarlier = matchesEarlier || imagesEqual(
+                atlas.tiles()[index].image,
+                atlas.tiles()[earlier].image);
+        }
+        uniqueCount += !matchesEarlier;
+    }
+    return uniqueCount;
 }
 
 [[nodiscard]] qrp::render::Image renderCommonQrp(
@@ -278,6 +380,7 @@ struct RenderCase {
     const qrp::atlas::WangTileAtlas& atlas,
     const std::array<qrp::math::EdgeFunction, 2>& edgeFunctions,
     const qrp::color::GradientPalette& palette,
+    const ContentSelection contentSelection,
     const bool enableCoons) {
     qrp::render::Image image(
         tiling.width() * kPixelsPerTile,
@@ -287,7 +390,10 @@ struct RenderCase {
         const std::size_t tileTop = (tiling.height() - gridY - 1) * kPixelsPerTile;
         for (std::size_t gridX = 0; gridX < tiling.width(); ++gridX) {
             const auto edges = tiling.tile(gridX, gridY);
-            const auto& content = atlas.select(edges).image;
+            const auto contentEdges = contentSelection == ContentSelection::WangSignature
+                ? edges
+                : qrp::atlas::WangEdgeSignature{};
+            const auto& content = atlas.select(contentEdges).image;
             const auto warp = createWarp(edges, edgeFunctions);
             for (std::size_t imageY = 0; imageY < kPixelsPerTile; ++imageY) {
                 for (std::size_t imageX = 0; imageX < kPixelsPerTile; ++imageX) {
@@ -387,6 +493,7 @@ struct RenderCase {
     const qrp::atlas::WangTileAtlas& atlas,
     const std::array<qrp::math::EdgeFunction, 2>& edgeFunctions,
     const qrp::color::GradientPalette& palette,
+    const ContentSelection contentSelection,
     const bool enableCoons) {
     constexpr std::size_t samplesPerEdge = 257;
     SeamMetrics metrics;
@@ -405,7 +512,10 @@ struct RenderCase {
         } else {
             valid = true;
         }
-        return sampleAtlasScalar(atlas.select(edges).image, parameter);
+        const auto contentEdges = contentSelection == ContentSelection::WangSignature
+            ? edges
+            : qrp::atlas::WangEdgeSignature{};
+        return sampleAtlasScalar(atlas.select(contentEdges).image, parameter);
     };
     const auto accumulate = [&](const double first,
                                 const double second,
@@ -461,7 +571,7 @@ struct RenderCase {
     const qrp::atlas::WangTileAtlas& atlas,
     const qrp::color::GradientPalette& palette) {
     constexpr std::size_t columns = 4;
-    constexpr std::size_t rows = 2;
+    const std::size_t rows = (atlas.tiles().size() + columns - 1) / columns;
     qrp::render::Image image(
         columns * atlas.tileSize(),
         rows * atlas.tileSize());
@@ -483,16 +593,22 @@ struct RenderCase {
     const qrp::atlas::WangTileAtlas& atlas,
     const std::array<qrp::math::EdgeFunction, 2>& edgeFunctions,
     const qrp::color::GradientPalette& palette,
+    const ContentSelection contentSelection,
     const bool enableCoons) {
     auto image = renderWangContent(
-        tiling, atlas, edgeFunctions, palette, enableCoons);
+        tiling, atlas, edgeFunctions, palette, contentSelection, enableCoons);
     const auto repeated = renderWangContent(
-        tiling, atlas, edgeFunctions, palette, enableCoons);
+        tiling, atlas, edgeFunctions, palette, contentSelection, enableCoons);
     const bool reproducible = imagesEqual(image, repeated);
     return {
         std::move(image),
         measureWangContentSeams(
-            tiling, atlas, edgeFunctions, palette, enableCoons),
+            tiling,
+            atlas,
+            edgeFunctions,
+            palette,
+            contentSelection,
+            enableCoons),
         {},
         reproducible,
     };
@@ -502,6 +618,18 @@ void writeCaseJson(
     std::ostream& output,
     const std::string_view id,
     const RenderCase& renderCase) {
+    const auto writeShiftValues = [&](const bool horizontal) {
+        output << '[';
+        for (std::size_t index = 0; index < renderCase.tileShifts.size(); ++index) {
+            if (index != 0) {
+                output << ',';
+            }
+            output << (horizontal
+                ? renderCase.tileShifts[index].horizontal
+                : renderCase.tileShifts[index].vertical);
+        }
+        output << ']';
+    };
     output << "    {\n"
            << "      \"id\": \"" << id << "\",\n"
            << "      \"reproducible\": "
@@ -517,49 +645,147 @@ void writeCaseJson(
                   renderCase.seams.maximumQuantizedChannelDifference)
            << ",\n"
            << "      \"meanOneTileShiftDifferenceX\": "
-           << renderCase.oneTileShift.horizontal << ",\n"
+           << renderCase.tileShifts.front().horizontal << ",\n"
            << "      \"meanOneTileShiftDifferenceY\": "
-           << renderCase.oneTileShift.vertical << "\n"
-           << "    }";
+           << renderCase.tileShifts.front().vertical << ",\n"
+           << "      \"meanTileShiftDifferencesX\": ";
+    writeShiftValues(true);
+    output << ",\n"
+           << "      \"meanTileShiftDifferencesY\": ";
+    writeShiftValues(false);
+    output << "\n    }";
+}
+
+void writeSignatureUsageJson(
+    std::ostream& output,
+    const std::string_view id,
+    const std::size_t dictionaryTileCount,
+    const SignatureUsageMetrics& usage) {
+    const auto writeRates = [&](const bool horizontal) {
+        output << '[';
+        for (std::size_t index = 0; index < usage.sameSignatureRates.size(); ++index) {
+            if (index != 0) {
+                output << ',';
+            }
+            output << (horizontal
+                ? usage.sameSignatureRates[index].horizontal
+                : usage.sameSignatureRates[index].vertical);
+        }
+        output << ']';
+    };
+    output << "    {\n"
+           << "      \"id\": \"" << id << "\",\n"
+           << "      \"dictionaryTileCount\": " << dictionaryTileCount << ",\n"
+           << "      \"uniqueSignaturesUsed\": "
+           << usage.uniqueSignatureCount << ",\n"
+           << "      \"maximumSignatureUseCount\": "
+           << usage.maximumSignatureUseCount << ",\n"
+           << "      \"effectiveSignatureCount\": "
+           << usage.effectiveSignatureCount << ",\n"
+           << "      \"sameSignatureRatesX\": ";
+    writeRates(true);
+    output << ",\n"
+           << "      \"sameSignatureRatesY\": ";
+    writeRates(false);
+    output << "\n    }";
 }
 
 void writeMetrics(
     const std::filesystem::path& path,
+    const ExperimentConfig& config,
     const qrp::atlas::WangTextureSampleOptimizationReport& optimization,
-    const qrp::atlas::WangTextureAtlasBuildResult& build,
-    const qrp::atlas::AtlasSeamMetrics& atlasSeams,
+    const qrp::atlas::WangTextureAtlasBuildResult& minimalBuild,
+    const qrp::atlas::AtlasSeamMetrics& minimalAtlasSeams,
+    const SignatureUsageMetrics& minimalUsage,
+    const std::size_t minimalUniqueTileImages,
+    const qrp::atlas::WangTextureAtlasBuildResult& completeBuild,
+    const qrp::atlas::AtlasSeamMetrics& completeAtlasSeams,
+    const SignatureUsageMetrics& completeUsage,
+    const std::size_t completeUniqueTileImages,
     const RenderCase& common,
+    const RenderCase& signatureBlind,
     const RenderCase& content,
-    const RenderCase& combined) {
+    const RenderCase& combined,
+    const RenderCase& completeContent) {
     std::ofstream output(path, std::ios::binary);
     if (!output) {
         throw std::runtime_error("Unable to open Wang-QRP ablation metrics output.");
     }
     output << std::setprecision(17)
            << "{\n"
-           << "  \"schemaVersion\": 1,\n"
+           << "  \"schemaVersion\": 4,\n"
            << "  \"experiment\": \"wang-conditioned-qrp-ablation\",\n"
+           << "  \"configuration\": \"" << config.id << "\",\n"
+           << "  \"sourcePhases\": [";
+    for (std::size_t index = 0; index < config.phases.size(); ++index) {
+        if (index != 0) {
+            output << ',';
+        }
+        output << config.phases[index];
+    }
+    output << "],\n"
+           << "  \"sampleSearchSeedHex\": \"0x"
+           << std::hex << config.sampleSearchSeed << std::dec << "\",\n"
+           << "  \"gridSeedHex\": \"0x"
+           << std::hex << config.gridSeed << std::dec << "\",\n"
            << "  \"gridWidth\": " << kGridWidth << ",\n"
            << "  \"gridHeight\": " << kGridHeight << ",\n"
            << "  \"pixelsPerTile\": " << kPixelsPerTile << ",\n"
            << "  \"edgeLabelCount\": 2,\n"
-           << "  \"tileCount\": " << build.atlas.tiles().size() << ",\n"
+           << "  \"minimalAtlasTileCount\": "
+           << minimalBuild.atlas.tiles().size() << ",\n"
+           << "  \"completeAtlasTileCount\": "
+           << completeBuild.atlas.tiles().size() << ",\n"
+           << "  \"minimalAtlasUniqueTileImageCount\": "
+           << minimalUniqueTileImages << ",\n"
+           << "  \"completeAtlasUniqueTileImageCount\": "
+           << completeUniqueTileImages << ",\n"
            << "  \"noiseEnabled\": false,\n"
+           << "  \"sampleOptimizationTarget\": \"minimal-even-parity-eight\",\n"
+           << "  \"completeAtlasUsesSharedSampleBank\": true,\n"
            << "  \"sampleCandidateGroupCount\": "
            << optimization.evaluatedCandidateGroupCount << ",\n"
            << "  \"firstCandidateCutCost\": "
            << optimization.firstCandidateCutCost << ",\n"
            << "  \"bestCandidateCutCost\": "
            << optimization.bestCutCost << ",\n"
-           << "  \"atlasMaximumQuantizedSeamDifference\": "
-           << static_cast<unsigned int>(atlasSeams.maximumChannelDifference)
+           << "  \"minimalAtlasMeanSquaredRgbCutCostPerPathPixel\": "
+           << static_cast<double>(minimalBuild.report.sumOfIndependentCutCosts)
+                / static_cast<double>(minimalBuild.report.independentCutPixelCount)
+           << ",\n"
+           << "  \"completeAtlasMeanSquaredRgbCutCostPerPathPixel\": "
+           << static_cast<double>(completeBuild.report.sumOfIndependentCutCosts)
+                / static_cast<double>(completeBuild.report.independentCutPixelCount)
+           << ",\n"
+           << "  \"minimalAtlasMaximumQuantizedSeamDifference\": "
+           << static_cast<unsigned int>(minimalAtlasSeams.maximumChannelDifference)
+           << ",\n"
+           << "  \"completeAtlasMaximumQuantizedSeamDifference\": "
+           << static_cast<unsigned int>(completeAtlasSeams.maximumChannelDifference)
            << ",\n"
            << "  \"cases\": [\n";
     writeCaseJson(output, "A_common_qrp_coons", common);
     output << ",\n";
+    writeCaseJson(output, "B0_signature_blind_identity", signatureBlind);
+    output << ",\n";
     writeCaseJson(output, "B_wang_content_identity", content);
     output << ",\n";
     writeCaseJson(output, "C_wang_content_coons", combined);
+    output << ",\n";
+    writeCaseJson(output, "D_complete16_shared_samples_identity", completeContent);
+    output << "\n  ],\n"
+           << "  \"signatureUsage\": [\n";
+    writeSignatureUsageJson(
+        output,
+        "B_minimal8",
+        minimalBuild.atlas.tiles().size(),
+        minimalUsage);
+    output << ",\n";
+    writeSignatureUsageJson(
+        output,
+        "D_complete16_shared_samples",
+        completeBuild.atlas.tiles().size(),
+        completeUsage);
     output << "\n  ]\n}\n";
 }
 
@@ -569,21 +795,39 @@ void validateCase(const std::string_view id, const RenderCase& renderCase) {
     }
     if (renderCase.seams.inverseFailureCount != 0
         || renderCase.seams.maximumQuantizedChannelDifference != 0) {
-        throw std::runtime_error(std::string(id) + " contains a visible seam.");
+        throw std::runtime_error(
+            std::string(id) + " contains a non-zero quantized boundary seam.");
     }
+}
+
+[[nodiscard]] const ExperimentConfig& selectConfig(
+    const std::string_view id) {
+    if (id == kPrimaryConfig.id) {
+        return kPrimaryConfig;
+    }
+    if (id == kHoldoutConfig.id) {
+        return kHoldoutConfig;
+    }
+    throw std::invalid_argument(
+        "Unknown experiment configuration; use 'primary' or 'holdout'.");
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
     try {
+        if (argc > 3) {
+            throw std::invalid_argument(
+                "Usage: qrp_wang_qrp_ablation [output-directory] [primary|holdout]");
+        }
+        const auto& config = selectConfig(argc > 2 ? argv[2] : "primary");
         const std::filesystem::path outputDirectory = argc > 1
             ? std::filesystem::path(argv[1])
             : std::filesystem::path("output/wang-qrp-ablation");
         std::filesystem::create_directories(outputDirectory);
 
         const auto palette = qrp::color::GradientPalette::createMidnightGold();
-        const auto scalarSource = createQrpSource();
+        const auto scalarSource = createQrpSource(config.phases);
         const auto edgeFunctions = createEdgeFunctions();
         const qrp::atlas::WangTextureSampleOptimizationOptions searchOptions{
             kPatchSize,
@@ -593,81 +837,164 @@ int main(int argc, char** argv) {
                 {128, 128, 128},
                 false,
             },
-            kSampleSearchSeed,
+            config.sampleSearchSeed,
             kCandidateGroupCount,
             kMinimumOriginDistancePixels,
         };
         const auto optimized = qrp::atlas::WangTextureSampleOptimizer::optimize(
             scalarSource,
             searchOptions);
-        const auto build = qrp::atlas::WangTextureAtlasBuilder::buildMinimalEight(
-            optimized.samples,
-            searchOptions.buildOptions);
-        const qrp::atlas::WangAtlasTiling tiling(
+        const auto minimalBuild =
+            qrp::atlas::WangTextureAtlasBuilder::buildMinimalEight(
+                optimized.samples,
+                searchOptions.buildOptions);
+        const auto completeBuild =
+            qrp::atlas::WangTextureAtlasBuilder::buildCompleteSixteen(
+                optimized.samples,
+                searchOptions.buildOptions);
+        const qrp::atlas::WangAtlasTiling minimalTiling(
             kGridWidth,
             kGridHeight,
-            build.atlas,
-            kGridSeed);
-        const auto atlasSeams = qrp::atlas::AtlasRenderer::measureAtlasCompatibility(
-            build.atlas);
-        if (atlasSeams.maximumChannelDifference != 0) {
-            throw std::runtime_error("The constructed scalar atlas has a non-zero seam.");
+            minimalBuild.atlas,
+            config.gridSeed);
+        const qrp::atlas::WangAtlasTiling completeTiling(
+            kGridWidth,
+            kGridHeight,
+            completeBuild.atlas,
+            config.gridSeed);
+        const auto minimalAtlasSeams =
+            qrp::atlas::AtlasRenderer::measureAtlasCompatibility(
+                minimalBuild.atlas);
+        const auto completeAtlasSeams =
+            qrp::atlas::AtlasRenderer::measureAtlasCompatibility(
+                completeBuild.atlas);
+        if (minimalAtlasSeams.maximumChannelDifference != 0
+            || completeAtlasSeams.maximumChannelDifference != 0) {
+            throw std::runtime_error(
+                "A constructed scalar atlas has a non-zero boundary seam.");
+        }
+        const auto completeCoverage = completeBuild.atlas.coverage();
+        if (!completeCoverage.complete || completeCoverage.tileCount != 16) {
+            throw std::runtime_error(
+                "The expanded scalar atlas does not contain all 16 signatures.");
+        }
+        const auto minimalUsage = measureSignatureUsage(minimalTiling);
+        const auto completeUsage = measureSignatureUsage(completeTiling);
+        const std::size_t minimalUniqueTileImages = countUniqueTileImages(
+            minimalBuild.atlas);
+        const std::size_t completeUniqueTileImages = countUniqueTileImages(
+            completeBuild.atlas);
+        if (minimalUniqueTileImages != 8 || completeUniqueTileImages != 16) {
+            throw std::runtime_error(
+                "The scalar atlas contains duplicate tile images.");
         }
 
         const auto commonGenerator = qrp::generators::TorusFourier::createQuasiRegular();
         auto commonImage = renderCommonQrp(
-            tiling, edgeFunctions, commonGenerator, palette);
+            minimalTiling, edgeFunctions, commonGenerator, palette);
         auto commonRepeated = renderCommonQrp(
-            tiling, edgeFunctions, commonGenerator, palette);
+            minimalTiling, edgeFunctions, commonGenerator, palette);
         const bool commonReproducible = imagesEqual(commonImage, commonRepeated);
         RenderCase common{
             std::move(commonImage),
             measureCommonQrpSeams(
-                tiling, edgeFunctions, commonGenerator, palette),
+                minimalTiling, edgeFunctions, commonGenerator, palette),
             {},
             commonReproducible,
         };
-        common.oneTileShift = measureOneTileShift(common.image);
+        common.tileShifts = measureTileShifts(common.image);
 
+        auto signatureBlind = makeWangContentCase(
+            minimalTiling,
+            minimalBuild.atlas,
+            edgeFunctions,
+            palette,
+            ContentSelection::FixedZeroSignature,
+            false);
+        signatureBlind.tileShifts = measureTileShifts(signatureBlind.image);
         auto content = makeWangContentCase(
-            tiling, build.atlas, edgeFunctions, palette, false);
-        content.oneTileShift = measureOneTileShift(content.image);
+            minimalTiling,
+            minimalBuild.atlas,
+            edgeFunctions,
+            palette,
+            ContentSelection::WangSignature,
+            false);
+        content.tileShifts = measureTileShifts(content.image);
         auto combined = makeWangContentCase(
-            tiling, build.atlas, edgeFunctions, palette, true);
-        combined.oneTileShift = measureOneTileShift(combined.image);
+            minimalTiling,
+            minimalBuild.atlas,
+            edgeFunctions,
+            palette,
+            ContentSelection::WangSignature,
+            true);
+        combined.tileShifts = measureTileShifts(combined.image);
+        auto completeContent = makeWangContentCase(
+            completeTiling,
+            completeBuild.atlas,
+            edgeFunctions,
+            palette,
+            ContentSelection::WangSignature,
+            false);
+        completeContent.tileShifts = measureTileShifts(completeContent.image);
 
         validateCase("A_common_qrp_coons", common);
+        validateCase("B0_signature_blind_identity", signatureBlind);
         validateCase("B_wang_content_identity", content);
         validateCase("C_wang_content_coons", combined);
+        validateCase("D_complete16_shared_samples_identity", completeContent);
+        for (const auto shift : signatureBlind.tileShifts) {
+            if (shift.horizontal != 0.0 || shift.vertical != 0.0) {
+                throw std::runtime_error(
+                    "The signature-blind control must repeat at every tile lag.");
+            }
+        }
 
         qrp::exporting::writePng(
             colorizeScalarImage(scalarSource, palette),
             outputDirectory / "source_qrp.png");
         qrp::exporting::writePng(
-            createAtlasSheet(build.atlas, palette),
+            createAtlasSheet(minimalBuild.atlas, palette),
             outputDirectory / "wang_content_tiles.png");
+        qrp::exporting::writePng(
+            createAtlasSheet(completeBuild.atlas, palette),
+            outputDirectory / "wang_content_tiles_16.png");
         qrp::exporting::writePng(
             common.image,
             outputDirectory / "A_common_qrp_coons.png");
+        qrp::exporting::writePng(
+            signatureBlind.image,
+            outputDirectory / "B0_signature_blind_identity.png");
         qrp::exporting::writePng(
             content.image,
             outputDirectory / "B_wang_content_identity.png");
         qrp::exporting::writePng(
             combined.image,
             outputDirectory / "C_wang_content_coons.png");
+        qrp::exporting::writePng(
+            completeContent.image,
+            outputDirectory / "D_complete16_shared_samples_identity.png");
         writeMetrics(
             outputDirectory / "metrics.json",
+            config,
             optimized.report,
-            build,
-            atlasSeams,
+            minimalBuild,
+            minimalAtlasSeams,
+            minimalUsage,
+            minimalUniqueTileImages,
+            completeBuild,
+            completeAtlasSeams,
+            completeUsage,
+            completeUniqueTileImages,
             common,
+            signatureBlind,
             content,
-            combined);
+            combined,
+            completeContent);
 
         const auto printCase = [](const std::string_view id, const RenderCase& value) {
             std::cout << id
-                      << ": shift_x=" << value.oneTileShift.horizontal
-                      << ", shift_y=" << value.oneTileShift.vertical
+                      << ": shift_x=" << value.tileShifts.front().horizontal
+                      << ", shift_y=" << value.tileShifts.front().vertical
                       << ", scalar_seam=" << value.seams.maximumScalarDifference
                       << ", quantized_seam="
                       << static_cast<unsigned int>(
@@ -675,9 +1002,16 @@ int main(int argc, char** argv) {
                       << '\n';
         };
         printCase("A_common_qrp_coons", common);
+        printCase("B0_signature_blind_identity", signatureBlind);
         printCase("B_wang_content_identity", content);
         printCase("C_wang_content_coons", combined);
-        std::cout << "Wrote Wang-QRP ablation to "
+        printCase("D_complete16_shared_samples_identity", completeContent);
+        std::cout << "configuration=" << config.id << '\n'
+                  << "effective_signatures_8="
+                  << minimalUsage.effectiveSignatureCount << '\n'
+                  << "effective_signatures_16="
+                  << completeUsage.effectiveSignatureCount << '\n'
+                  << "Wrote Wang-QRP ablation to "
                   << outputDirectory.string() << '\n';
     } catch (const std::exception& error) {
         std::cerr << "Wang-QRP ablation failed: " << error.what() << '\n';

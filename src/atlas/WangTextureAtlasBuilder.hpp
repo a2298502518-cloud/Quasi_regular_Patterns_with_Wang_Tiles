@@ -66,6 +66,10 @@ public:
     [[nodiscard]] static WangTextureAtlasBuildResult buildMinimalEight(
         const WangEdgeSampleBank& samples,
         const WangTextureAtlasBuildOptions& options);
+
+    [[nodiscard]] static WangTextureAtlasBuildResult buildCompleteSixteen(
+        const WangEdgeSampleBank& samples,
+        const WangTextureAtlasBuildOptions& options);
 };
 
 } // namespace qrp::atlas

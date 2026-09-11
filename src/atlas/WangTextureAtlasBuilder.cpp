@@ -558,11 +558,15 @@ void validateSamples(
         + "_E" + std::to_string(edges.east);
 }
 
-} // namespace
+enum class SignatureSet {
+    MinimalEvenParityEight,
+    CompleteCartesianSixteen,
+};
 
-WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
+[[nodiscard]] WangTextureAtlasBuildResult buildAtlas(
     const WangEdgeSampleBank& samples,
-    const WangTextureAtlasBuildOptions& options) {
+    const WangTextureAtlasBuildOptions& options,
+    const SignatureSet signatureSet) {
     validateSamples(samples);
     const std::size_t patchSize = samples.northSouth.front().width();
     const WangQuiltGeometry geometry(
@@ -577,10 +581,12 @@ WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
     std::vector<WangImageTile> tiles;
     std::vector<WangTextureTileBuildMetrics> metrics;
     std::vector<WangTextureTileDebugImage> debugImages;
-    tiles.reserve(8);
-    metrics.reserve(8);
+    const std::size_t expectedTileCount =
+        signatureSet == SignatureSet::MinimalEvenParityEight ? 8 : 16;
+    tiles.reserve(expectedTileCount);
+    metrics.reserve(expectedTileCount);
     if (options.includeDebugImages) {
-        debugImages.reserve(8);
+        debugImages.reserve(expectedTileCount);
     }
 
     std::uint64_t independentCutCostSum = 0;
@@ -588,7 +594,8 @@ WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
         for (std::uint32_t north = 0; north < 2; ++north) {
             for (std::uint32_t west = 0; west < 2; ++west) {
                 for (std::uint32_t east = 0; east < 2; ++east) {
-                    if ((south ^ north ^ west ^ east) != 0U) {
+                    if (signatureSet == SignatureSet::MinimalEvenParityEight
+                        && (south ^ north ^ west ^ east) != 0U) {
                         continue;
                     }
                     const auto edges =
@@ -643,15 +650,14 @@ WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
         }
     }
 
-    constexpr std::size_t kExpectedMinimalTileCount = 8;
     constexpr std::size_t kIndependentCutsPerTile = 4;
-    if (tiles.size() != kExpectedMinimalTileCount
-        || metrics.size() != kExpectedMinimalTileCount
+    if (tiles.size() != expectedTileCount
+        || metrics.size() != expectedTileCount
         || (options.includeDebugImages
-            ? debugImages.size() != kExpectedMinimalTileCount
+            ? debugImages.size() != expectedTileCount
             : !debugImages.empty())) {
         throw std::logic_error(
-            "Minimal Wang texture atlas construction violated its cardinality.");
+            "Wang texture atlas construction violated its signature-set cardinality.");
     }
     const std::size_t independentCutCount = checkedMultiply(
         metrics.size(),
@@ -676,6 +682,26 @@ WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
         std::move(report),
         std::move(debugImages),
     };
+}
+
+} // namespace
+
+WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildMinimalEight(
+    const WangEdgeSampleBank& samples,
+    const WangTextureAtlasBuildOptions& options) {
+    return buildAtlas(
+        samples,
+        options,
+        SignatureSet::MinimalEvenParityEight);
+}
+
+WangTextureAtlasBuildResult WangTextureAtlasBuilder::buildCompleteSixteen(
+    const WangEdgeSampleBank& samples,
+    const WangTextureAtlasBuildOptions& options) {
+    return buildAtlas(
+        samples,
+        options,
+        SignatureSet::CompleteCartesianSixteen);
 }
 
 } // namespace qrp::atlas
