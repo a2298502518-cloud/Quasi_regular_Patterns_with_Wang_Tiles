@@ -19,7 +19,9 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - [交互编辑器与提交语义](./docs/interactive-editor.md)
 - [PNG 与参数导出](./docs/export.md)
 - [主论文与当前实现审计](./docs/paper-implementation-audit.md)
+- [主方法 v2 候选方案](./docs/main-method-v2-proposal.md)
 - [经典图像 Wang Tile 对照基线](./docs/classic-wang-reference.md)
+- [Wang 纹理 Atlas 构造基线](./docs/wang-texture-atlas-construction.md)
 - 已覆盖 625 种默认边颜色组合的 CPU 数学测试
 - 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
 - 单瓦片、2 x 2 与三套 10 x 10 固定种子展示预设，以及独立接缝误差热图
@@ -28,6 +30,7 @@ CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和�
 - 经验证后才替换权威场景的 draft/committed 参数事务与 revision
 - CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
 - 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
+- 由四张受控样本、最小误差拼接和 45 度旋转裁剪确定性构造的 8-tile 纹理 atlas 实验
 
 本地主论文是研究工作的主体，`docs/math-spec.md` 是与论文同步维护的实现契约。外部
 论文只用于理论借鉴、术语澄清和相关工作比较，不作为本项目的独立复现目标。
@@ -67,6 +70,13 @@ ctest --test-dir build -C Release --output-on-failure
 
 ```powershell
 .\build\Release\qrp_classic_wang_reference.exe output\classic-wang-reference
+```
+
+生成由四张受控样本构造的 8-tile 纹理 atlas、cut 路径和 10 x 10 铺砌（同样不进入
+正式预设）：
+
+```powershell
+.\build\Release\qrp_wang_texture_atlas.exe output\wang-texture-atlas
 ```
 
 运行实时程序：

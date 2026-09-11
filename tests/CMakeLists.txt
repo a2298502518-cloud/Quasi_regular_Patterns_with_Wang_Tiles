@@ -43,6 +43,21 @@ endif()
 
 add_test(NAME qrp_atlas_tests COMMAND qrp_atlas_tests)
 
+add_executable(qrp_quilting_tests
+    quilting_tests.cpp
+)
+
+target_link_libraries(qrp_quilting_tests PRIVATE qrp_atlas)
+target_compile_features(qrp_quilting_tests PRIVATE cxx_std_20)
+
+if(MSVC)
+    target_compile_options(qrp_quilting_tests PRIVATE /W4 /permissive- /utf-8)
+else()
+    target_compile_options(qrp_quilting_tests PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+add_test(NAME qrp_quilting_tests COMMAND qrp_quilting_tests)
+
 add_test(
     NAME qrp_classic_wang_reference_smoke
     COMMAND

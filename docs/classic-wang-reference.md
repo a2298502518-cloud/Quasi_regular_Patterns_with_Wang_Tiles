@@ -56,9 +56,10 @@ per-tile 随机内容。
 结构、图像、手写 tile 表或经验常数。当前阶段吸收的是公开论文和参考工程共同展示的
 算法思想：有限内容 tile 集、显式边码、受约束的扫描线选片以及 atlas 与铺砌器分离。
 
-参考工程还包含“源图 patch -> overlap seam -> 旋转裁剪 -> 8 张纹理 tile”的 atlas
-构造实验。该部分尚未进入当前基线；如果继续实现，应以 Cohen et al. 2003 与
-Efros--Freeman 2001 为依据进行 clean-room 重写，并使用自有或明确授权的输入素材。
+在这条铺砌基线之上，项目现已另行加入“4 张受控源 patch -> overlap minimum-error
+quilting -> 45 度旋转裁剪 -> 8 张纹理 tile”的确定性 atlas 构造实验。它依据正式论文
+进行 clean-room 实现，不复制参考工程的源码、资产或经验常数；定义、边界修正口径和
+验证方法见 [Wang 纹理 Atlas 构造基线](./wang-texture-atlas-construction.md)。
 
 ## 4. 运行与输出
 

@@ -37,6 +37,7 @@
 | --- | --- | --- | --- |
 | 边标签匹配 | `src/model/WangGrid.*` | 已实现随机合法网格 | 固定种子、邻边相等与选择分布测试 |
 | 经典有限图像 tile 对照 | `src/atlas/*` | 独立实现 8-tile 偶校验集合、约束选片与直接拼接 | 候选数、可复现性、方向和逐像素接缝测试 |
+| 四样本纹理 atlas 构造 | `MinimumErrorCut.*`、`WangQuiltGeometry.*`、`WangTextureAtlasBuilder.*` | 确定性实现 overlap quilting、旋转裁剪与 8-tile 构造 | DP oracle、几何来源、因果性、修边幅度与完整兼容边对 |
 | 边标签对应边函数 | `src/model/EdgePalette.*`、`src/math/EdgeFunction.*` | 属于本地论文扩展，不是经典 Wang Tile 的通用定义 | 每种颜色的函数图、端点和单调性表 |
 | 四边 Coons warp | `src/math/CoonsWarp.*` | 已实现，但全局可逆性不能只由单边单调推出 | 组合 Jacobian 下界、稠密采样和逆映射残差 |
 | 逆映射后采样生成器 | `src/render/CpuReferenceRenderer.cpp`、`shaders/wang_pattern.frag` | 是论文核心管线 | identity/warped 对照图与 CPU/GPU 分阶段误差 |
@@ -92,6 +93,8 @@
 边标签与 Coons 逆映射使结果不再满足单 tile 平移重复，但不足以消除公共母纹的周期拓扑；
 下一步应讨论主论文中的内容构造定义，而不是继续叠加与边标签关系不清的随机项。
 公开项目 `sashaouellet/WangTile` 只作为 atlas/image quilting 路线的工程对照与设计启发。
-本项目已独立加入有限 8-tile 集合、扫描线约束选片和直接图像拼接的经典基线，但没有
-复制其代码、图片、手写表或经验常数；其 patch quilting 与旋转裁剪仍未实现。基线的
-定义、边界和运行方式见 [经典图像 Wang Tile 对照基线](./classic-wang-reference.md)。
+本项目没有复制其代码、图片、手写表或经验常数。有限 8-tile 集合、扫描线约束选片与
+直接图像拼接构成第一层经典基线；四样本 patch quilting、45 度旋转裁剪和纹理 atlas
+构成第二层 clean-room 实验。两层分别见
+[经典图像 Wang Tile 对照基线](./classic-wang-reference.md)与
+[Wang 纹理 Atlas 构造基线](./wang-texture-atlas-construction.md)。
