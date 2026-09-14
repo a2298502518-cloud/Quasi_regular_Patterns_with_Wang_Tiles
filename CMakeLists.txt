@@ -143,12 +143,8 @@ target_compile_features(qrp_render PUBLIC cxx_std_20)
 
 add_library(qrp_atlas STATIC
     src/atlas/AtlasRenderer.cpp
-    src/atlas/MinimumErrorCut.cpp
     src/atlas/WangAtlasTiling.cpp
-    src/atlas/WangQuiltGeometry.cpp
     src/atlas/WangTileAtlas.cpp
-    src/atlas/WangTextureAtlasBuilder.cpp
-    src/atlas/WangTextureSampleOptimizer.cpp
 )
 
 target_link_libraries(qrp_atlas
@@ -192,20 +188,6 @@ add_executable(qrp_classic_wang_reference
 
 target_link_libraries(qrp_classic_wang_reference PRIVATE qrp_atlas qrp_export)
 target_compile_features(qrp_classic_wang_reference PRIVATE cxx_std_20)
-
-add_executable(qrp_wang_texture_atlas
-    apps/wang_texture_atlas_main.cpp
-)
-
-target_link_libraries(qrp_wang_texture_atlas PRIVATE qrp_atlas qrp_export)
-target_compile_features(qrp_wang_texture_atlas PRIVATE cxx_std_20)
-
-add_executable(qrp_wang_qrp_ablation
-    apps/wang_qrp_ablation_main.cpp
-)
-
-target_link_libraries(qrp_wang_qrp_ablation PRIVATE qrp_atlas qrp_export)
-target_compile_features(qrp_wang_qrp_ablation PRIVATE cxx_std_20)
 
 if(QRP_BUILD_REALTIME)
     add_library(qrp_opengl STATIC
@@ -279,8 +261,6 @@ foreach(target
     qrp_cpu_reference
     qrp_paper_core_audit
     qrp_classic_wang_reference
-    qrp_wang_texture_atlas
-    qrp_wang_qrp_ablation
 )
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
