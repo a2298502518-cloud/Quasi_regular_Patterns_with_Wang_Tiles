@@ -15,8 +15,16 @@ compile_commands.json
 /output/
 /out/
 /tmp/
+/.codex-temp/
 /.cache/
 *.log
+
+# Report generator caches and intermediates
+/tools/report/node_modules/
+/tools/report/__pycache__/
+/tools/report/method-flow.png
+/tools/report/equations/*.png
+/tools/report/equations/manifest.json
 
 # Local research library
 # Third-party PDFs are kept for personal research and are not redistributed

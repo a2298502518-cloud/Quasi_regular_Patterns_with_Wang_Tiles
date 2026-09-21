@@ -21,9 +21,7 @@ namespace {
     return bytes;
 }
 
-} // namespace
-
-std::vector<std::uint8_t> encodePng(const render::Image& image) {
+[[nodiscard]] std::vector<std::uint8_t> encodePng(const render::Image& image) {
     if (image.width() > std::numeric_limits<unsigned>::max()
         || image.height() > std::numeric_limits<unsigned>::max()) {
         throw std::length_error("PNG dimensions exceed the encoder limit.");
@@ -36,7 +34,7 @@ std::vector<std::uint8_t> encodePng(const render::Image& image) {
     state.info_png.color.colortype = LCT_RGB;
     state.info_png.color.bitdepth = 8;
     state.encoder.auto_convert = 0;
-    // Shader 输出已经编码为 sRGB；显式 chunk 防止查看器按未知设备色彩解释。
+    // 图像像素已经编码为 sRGB；显式 chunk 防止查看器按未知设备色彩解释。
     state.info_png.srgb_defined = 1;
     state.info_png.srgb_intent = 0;
     state.info_png.gama_defined = 1;
@@ -63,6 +61,8 @@ std::vector<std::uint8_t> encodePng(const render::Image& image) {
     }
     return encoded;
 }
+
+} // namespace
 
 void writePng(const render::Image& image, const std::filesystem::path& path) {
     const auto encoded = encodePng(image);

@@ -1,54 +1,63 @@
 # Quasi-regular Patterns with Wang Tiles
 
-一个面向论文实现与生成艺术创作的交互式图形项目。项目以 Wang Tiles、
-domain-invariant Coons warp 和环面连续生成器为核心，在可验证无缝的前提下生成
-非周期、可调且适合高分辨率输出的图案。
+本项目研究一种确定性的程序化纹样模型：使用 Wang 瓦片边标签构造全局
+`C¹` 连续参数场，再用该参数场调制 quasi-regular pattern（QRP）的方向相位。
+当前仓库只保留一条权威实现路径，即 `20 × 20` 的 CPU Wang-QRP 实验。
 
-## 当前状态
+## 当前方法
 
-CPU 数学核心、CPU 基准渲染、GPU 实时渲染、交互视觉系统和可复现导出已经完成。当前仓库包含：
+每个瓦片使用同一套解析公式。瓦片之间的差异仅来自合法 Wang 网格上的四条边标签，
+不使用预生成图片瓦片、逐瓦片随机相位、逐瓦片随机噪声、随机旋转或逐图归一化。
 
-- 原始论文：[Quasi_regular_Patterns_with_Wang_Tiles_.pdf](./Quasi_regular_Patterns_with_Wang_Tiles_.pdf)
-- [实现计划](./docs/implementation-plan.md)
-- [数学与坐标规范](./docs/math-spec.md)
-- [验证方案](./docs/validation.md)
-- [文献地图与实现核查清单](./docs/literature-map.md)
-- [本地参考文献库说明与 BibTeX](./references/README.md)
-- [CPU 基准与复现记录](./docs/cpu-baselines.md)
-- [GPU 基准与一致性记录](./docs/gpu-baselines.md)
-- [交互编辑器与提交语义](./docs/interactive-editor.md)
-- [PNG 与参数导出](./docs/export.md)
-- [主论文与当前实现审计](./docs/paper-implementation-audit.md)
-- [经典图像 Wang Tile 对照基线](./docs/classic-wang-reference.md)
-- 已覆盖 625 种默认边颜色组合的 CPU 数学测试
-- 周期 Fourier/QRP、周期梯度噪声、连续调色板和 CPU 双精度参考渲染器
-- 单瓦片、2 x 2 与三套 10 x 10 固定种子展示预设，以及独立接缝误差热图
-- OpenGL 4.3 实时主视图、相机平移缩放和 Jacobian/Newton/瓦片边界调试视图
-- 可编辑 Wang 网格、边函数、生成器和色带的 Dear ImGui 面板
-- 经验证后才替换权威场景的 draft/committed 参数事务与 revision
-- CPU/GLSL 一致的 Oklab 色带、抗锯齿轮廓和边界安全浮雕
-- 与实时预览共用 Shader 的高分辨率 sRGB PNG，以及完整参数 JSON 伴随文件
-- 用于澄清有限 tile set、边标签匹配与约束选片语义的经典 8-tile 图像对照
+当前数据流为：
 
-本地主论文是研究工作的主体，`docs/math-spec.md` 是与论文同步维护的实现契约。外部
-论文只用于理论借鉴、术语澄清和相关工作比较，不作为本项目的独立复现目标。
+```text
+WangGrid
+  -> WangContentWeight
+  -> ParametricWangQrpField
+  -> HierarchicalQrpComposition
+  -> GradientPalette
+  -> PNG
+```
 
-## 目标形态
+- `WangGrid` 生成满足相邻边标签一致的有限网格。
+- `WangContentWeight` 将四条边标签延拓为全局 `C¹` 权重场 `W(x)`。
+- `ParametricWangQrpField` 用二阶角谐波相位参数生成粗尺度 QRP 场。
+- `HierarchicalQrpComposition` 以统一门控公式加入固定的中、细尺度残差。
+- 实验入口将场值映射到固定色带并输出可复现实验图。
 
-- C++20、CMake、OpenGL/GLSL 桌面应用。
-- CPU 双精度参考实现与 GPU 实时渲染实现相互校验。
-- 可交互编辑 Wang 边函数、铺砌种子、生成器和调色板。
-- 提供 Jacobian、Newton 残差和接缝误差调试视图。
-- 支持高分辨率无缝图案导出与可复现参数。
+当前结论只适用于有限的 `20 × 20` 实验窗口。项目没有证明无限铺砌严格非周期，
+也没有声称已完成 GPU、实时 UI 或交互编辑器集成。
 
-## 计划中的首个里程碑
+## 代码结构
 
-实时显示 10 x 10 Wang 铺砌，支持周期噪声和 torus-safe QRP 两类生成器，包含
-接缝误差视图以及至少三套经过视觉打磨的预设。
+| 路径 | 职责 |
+| --- | --- |
+| `src/model/WangGrid.*` | 合法 Wang 边标签网格 |
+| `src/generators/CanonicalQrpField.*` | Canonical QRP 参考定义 |
+| `src/model/WangContentWeight.*` | 标签到全局 `C¹` 权重场 |
+| `src/model/ParametricWangQrpField.*` | 二阶角谐波参数化 QRP |
+| `src/model/HierarchicalQrpComposition.*` | 多尺度层级合成 |
+| `src/color/GradientPalette.*` | 固定连续色带 |
+| `src/render/Image.*` | CPU RGB 图像缓冲 |
+| `src/export/PngWriter.*` | PNG 编码与写出 |
+| `apps/wang_qrp_experiment_main.cpp` | 唯一实验入口 |
+| `tests/` | 五组数学与模型单元测试 |
+| `tools/report/` | 当前 Word 实验报告的可复现生成源 |
+
+CMake 的运行时依赖只包含 `qrp_wang_qrp_core`、`qrp_raster`、`qrp_png` 和
+`qrp_wang_qrp_experiment`。`qrp_qrp_reference` 仅在启用测试时构建，作为
+canonical QRP oracle，不进入实验程序的依赖图。
+
+数学定义以
+[当前模型说明](docs/content-constrained-wang-model.md)为准；验证边界见
+[验证方案](docs/validation.md)，文献用途见
+[文献地图](docs/literature-map.md)，固定实验状态见
+[项目交接记录](docs/chat-handoff-2026-09-18.md)。
 
 ## 构建与测试
 
-Windows + Visual Studio 2022：
+Windows、Visual Studio 2022：
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
@@ -56,50 +65,40 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-生成可复现的 CPU 基准图（PPM 文件和误差热图写入被 Git 忽略的输出目录）：
+当前测试集合由五个 CTest 目标组成：
+
+- `qrp_wang_grid_tests`
+- `qrp_canonical_qrp_tests`
+- `qrp_wang_content_weight_tests`
+- `qrp_hierarchical_qrp_composition_tests`
+- `qrp_parametric_wang_qrp_field_tests`
+
+## 运行实验
 
 ```powershell
-.\build\Release\qrp_cpu_reference.exe output\cpu
+cmake --build build --config Release --target qrp_wang_qrp_experiment
+.\build\Release\qrp_wang_qrp_experiment.exe output\wang-qrp-experiment
 ```
 
-当前构建产生 CPU 参考工具、论文核心审计工具、经典 Wang 对照、测试程序和带参数面板的
-GPU 实时桌面应用。
+实验固定使用 `20 × 20` 网格、每瓦片 `80 × 80` 像素、五种边标签和固定随机种子。
+输出目录包含七张图：
 
-生成独立的经典 8-tile 图像 atlas 对照（不进入正式预设）：
+- `A_coarse_parameter_family.png`
+- `B_layered_parameter_family.png`
+- `C_uniform_vs_wang.png`
+- `P0_zero_phase.png`
+- `P1_axis_phase.png`
+- `P2_oblique_phase.png`
+- `P3_opposed_phase.png`
 
-```powershell
-.\build\Release\qrp_classic_wang_reference.exe output\classic-wang-reference
-```
+当前实验报告为
+`reports/基于QRP与Wangtile的准规则纹样生成实验报告.docx`，生成说明见
+`tools/report/README.md`。
 
-运行实时程序：
+## 当前边界
 
-```powershell
-.\build\Release\qrp_realtime.exe
-```
-
-- 鼠标左键拖动：平移。
-- 滚轮：以光标为中心缩放。
-- `1`–`5`：切换固定预设。
-- `D`：切换图案、Jacobian、Newton 残差和瓦片边界视图。
-- `R`：重置相机；`Esc`：退出。
-- 面板预设只载入草稿；`Apply validated draft` 校验并提交，`Discard` 放弃草稿。
-- `PNG export` 面板只导出已提交场景；分辨率倍率默认是 4。
-
-从命令行直接导出预设 3 的 2880 x 2880 PNG 与同名 JSON：
-
-```powershell
-.\build\Release\qrp_realtime.exe --preset 3 --export output\exports\pattern.png --export-scale 4
-```
-
-也可用 `--size WIDTH HEIGHT` 指定画布并居中铺满（必要时裁切网格）；详见
-[PNG 与参数导出](./docs/export.md)。
-
-运行隐藏窗口的 GPU/CPU 分阶段一致性检查：
-
-```powershell
-cmake --build build --config Release --target qrp_gpu_validate
-```
-
-构建系统固定并获取 LodePNG、GLFW 3.4 与 Dear ImGui 1.92.9；仓库内包含由 glad
-2.0.8 生成的纯 OpenGL 4.3 core loader，因此构建不依赖额外 Python 包。若只需要 CPU
-目标，可在配置时传入 `-DQRP_BUILD_REALTIME=OFF`。
+- 共享边的场值和完整梯度由解析构造与单元测试共同验证。
+- 参数组之间的差异使用固定网格、固定层级和固定色带进行比较。
+- `uniform--Wang` 对照只切换权重场，避免混入其他变量。
+- 当前输出是研究实验结果，不是已集成的实时产品路径。
+- 严格非周期性、GPU 等价实现、交互编辑和通用导出格式均不在当前完成范围内。

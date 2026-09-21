@@ -15,13 +15,6 @@ namespace {
         : std::pow((value + 0.055) / 1.055, 2.4);
 }
 
-[[nodiscard]] double encodeSrgb(const double value) noexcept {
-    const double bounded = std::clamp(value, 0.0, 1.0);
-    return bounded <= 0.0031308
-        ? 12.92 * bounded
-        : 1.055 * std::pow(bounded, 1.0 / 2.4) - 0.055;
-}
-
 [[nodiscard]] Color3 linearRgbFromSrgb8(
     const std::uint8_t red,
     const std::uint8_t green,
@@ -144,36 +137,6 @@ GradientPalette GradientPalette::createMidnightGold() {
     }, ToneSettings{0.0, 2.10, 8.0, 0.10});
 }
 
-GradientPalette GradientPalette::createMineral() {
-    return GradientPalette({
-        {0.00, linearRgbFromSrgb8(7, 26, 31)},
-        {0.22, linearRgbFromSrgb8(18, 72, 75)},
-        {0.45, linearRgbFromSrgb8(57, 126, 116)},
-        {0.67, linearRgbFromSrgb8(184, 195, 153)},
-        {0.84, linearRgbFromSrgb8(214, 133, 91)},
-        {1.00, linearRgbFromSrgb8(246, 222, 189)},
-    }, ToneSettings{-0.02, 2.35, 5.0, 0.08});
-}
-
-GradientPalette GradientPalette::createAurora() {
-    return GradientPalette({
-        {0.00, linearRgbFromSrgb8(12, 4, 31)},
-        {0.20, linearRgbFromSrgb8(48, 17, 105)},
-        {0.42, linearRgbFromSrgb8(49, 76, 180)},
-        {0.62, linearRgbFromSrgb8(41, 188, 204)},
-        {0.80, linearRgbFromSrgb8(137, 238, 190)},
-        {1.00, linearRgbFromSrgb8(255, 153, 198)},
-    }, ToneSettings{0.0, 1.95, 7.0, 0.12});
-}
-
-const std::vector<ColorStop>& GradientPalette::stops() const noexcept {
-    return stops_;
-}
-
-const ToneSettings& GradientPalette::tone() const noexcept {
-    return tone_;
-}
-
 Color3 GradientPalette::sample(const double scalar) const noexcept {
     double coordinate = 0.5 + 0.5 * std::tanh(tone_.contrast * (scalar - tone_.center));
     if (tone_.bandFrequency > 0.0 && tone_.bandStrength > 0.0) {
@@ -203,30 +166,6 @@ Color3 GradientPalette::sample(const double scalar) const noexcept {
     const double local = (coordinate - first.position)
         / (second.position - first.position);
     return interpolateOklab(first.color, second.color, smoothstep(local));
-}
-
-double maximumChannelDifference(const Color3 first, const Color3 second) noexcept {
-    return std::max({
-        std::abs(first.red - second.red),
-        std::abs(first.green - second.green),
-        std::abs(first.blue - second.blue),
-    });
-}
-
-Color3 linearFromSrgb(const Color3 color) noexcept {
-    return {
-        decodeSrgb(std::clamp(color.red, 0.0, 1.0)),
-        decodeSrgb(std::clamp(color.green, 0.0, 1.0)),
-        decodeSrgb(std::clamp(color.blue, 0.0, 1.0)),
-    };
-}
-
-Color3 srgbFromLinear(const Color3 color) noexcept {
-    return {
-        encodeSrgb(color.red),
-        encodeSrgb(color.green),
-        encodeSrgb(color.blue),
-    };
 }
 
 } // namespace qrp::color
