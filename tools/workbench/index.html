@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QRP 纹样试调台</title>
+  <style>
+    :root{color-scheme:light;--ink:#193b3a;--muted:#607471;--line:#d9ded5;--paper:#f5f4ed;--accent:#bd7041}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.55 "Microsoft YaHei",system-ui,sans-serif}
+    button,input,select{font:inherit}button,a.action{cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:9px 14px;background:#fff;color:var(--ink);text-decoration:none}
+    button:hover,a.action:hover{border-color:var(--accent)}button:disabled,a.disabled{opacity:.4;cursor:default;pointer-events:none}
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #c08046;outline-offset:3px}
+    header{padding:27px 36px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:20px}
+    .eyebrow{color:var(--accent);font-size:11px;letter-spacing:.2em;font-weight:700}h1{font-size:28px;margin:3px 0 0;font-weight:600;letter-spacing:.03em}
+    header p{margin:0;color:var(--muted);max-width:420px;font-size:13px}.layout{display:grid;grid-template-columns:310px minmax(0,1fr);max-width:1560px;margin:auto}
+    aside{padding:24px;border-right:1px solid var(--line)}h2{font-size:15px;margin:0 0 12px}.presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:22px}
+    .preset{text-align:left;padding:10px 11px}.preset strong{display:block}.preset small{font-size:10px;color:var(--muted)}.preset.active{background:#e7eee5;border-color:#7b9a87}
+    .field{margin:13px 0}.field label{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px}.field output{color:var(--muted);font-variant-numeric:tabular-nums}
+    input[type=range]{width:100%;accent-color:var(--ink);height:20px;margin:4px 0 0;cursor:pointer}select{padding:6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);width:100%;margin-top:6px}
+    .hint{font-size:11px;color:var(--muted);margin:10px 0}.rule{height:1px;background:var(--line);margin:20px 0}details summary{cursor:pointer;color:var(--muted);font-size:13px}
+    .primary{background:var(--ink);color:white;width:100%;border:0;font-weight:600;padding:11px}#validation{color:#a33b2e;min-height:19px;font-size:11px;margin:8px 0}
+    .import-row{display:flex;gap:8px;margin-top:12px;font-size:12px}.import-row>*{flex:1;text-align:center;padding:8px 4px}.stage{padding:24px 30px;min-width:0}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.tabs{display:flex;gap:4px}.tab{font-size:12px;padding:7px 11px;background:transparent;border-color:transparent}.tab.active{background:#e0e8df;border-color:#c6d5c4}
+    .compare-toggle{font-size:12px}.canvases{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}.canvases.comparing{grid-template-columns:1fr 1fr}
+    figure{margin:0;min-width:0}figcaption{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;gap:10px}
+    .frame{background:#e6e6dc;border:1px solid #d1d6cc;border-radius:6px;overflow:hidden;aspect-ratio:1;display:grid;place-items:center;position:relative}
+    .frame img{width:100%;height:100%;object-fit:contain;display:block}.frame img:not([src]){display:none}.frame span{position:absolute;color:var(--muted);font-size:13px}.busy .frame img{opacity:.6}
+    #pinnedFigure[hidden]{display:none}#pinInfo{font-size:11px;color:var(--muted);margin-top:8px}.status-line{display:flex;align-items:center;gap:10px;margin-top:15px;min-height:26px;font-size:12px}
+    .dot{width:7px;height:7px;background:#76997c;border-radius:50%;flex-shrink:0}.busy .dot{background:var(--accent);animation:pulse 1s infinite}.error{color:#a33b2e}
+    .bottom-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap}.bottom-row p{font-size:11px;color:var(--muted);margin:0;max-width:480px}
+    .exports{display:flex;gap:8px;font-size:12px}.exports button,.exports a{padding:8px 12px}.footnote{font-size:11px;color:var(--muted);margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+    @keyframes pulse{50%{opacity:.3}}@media(min-width:1200px){.canvases:not(.comparing){max-width:800px;margin:auto}}
+    @media(max-width:900px){header{padding:18px 22px}header p{display:none}.layout{grid-template-columns:260px minmax(0,1fr)}aside{padding:18px}.stage{padding:20px}.canvases.comparing{grid-template-columns:1fr}}
+    @media(max-width:620px){.layout{display:flex;flex-direction:column}.stage{order:-1}.frame{max-height:60vh}aside{border-right:0;border-top:1px solid var(--line)}.presets{grid-template-columns:repeat(4,1fr)}.preset small{display:none}}
+  </style>
+</head>
+<body>
+  <header><div><div class="eyebrow">DIRECT QRP / SHAPE & SPACE</div><h1>纹样试调台 · A 路线</h1></div><p>保留 QRP 的几何关系，调整形状、留白与线条。<br>预览和导出使用同一份轮廓几何，可保存参数重现。</p></header>
+  <main class="layout">
+    <aside>
+      <h2>01 / 选择起点</h2><div id="presets" class="presets"></div>
+      <h2>02 / QRP 与轮廓表达</h2><div id="primaryControls"></div>
+      <p class="hint">形状扩展越大，单元越容易连接。留白会向内收缩，过大会消去小单元；线宽与留白均相对于图案尺度。</p>
+      <div class="rule"></div><details><summary>微调 QRP 相位</summary><div id="advancedControls"></div><p class="hint">本轮固定五方向 QRP；A/B 在小范围内改变几何关系。不叠加独立噪声细节。</p></details>
+      <p id="validation" role="alert"></p><button id="apply" class="primary" disabled>应用参数 · 生成预览</button>
+      <div class="import-row"><button id="import" disabled>导入参数</button><a id="save" class="action disabled" download="qrp-recipe.json">保存当前图参数</a></div>
+      <input id="recipeFile" type="file" accept=".json,application/json" hidden>
+    </aside>
+    <section class="stage" id="stage">
+      <div class="toolbar"><div class="tabs" role="group" aria-label="观察视图"><button class="tab active" data-view="color" aria-pressed="true">纹样</button><button class="tab" data-view="coarse_gray" aria-pressed="false">QRP 场</button><button class="tab" data-view="mask" aria-pressed="false">形状蒙版</button></div><button id="pin" class="compare-toggle" disabled>固定当前图作对比</button></div>
+      <div class="canvases" id="canvases">
+        <figure id="pinnedFigure" hidden><figcaption><span>固定参考</span><button id="unpin" class="tab">取消对比</button></figcaption><div class="frame"><img id="pinnedImage" alt="固定参考纹样"></div><div id="pinInfo"></div></figure>
+        <figure><figcaption><span id="currentLabel">当前结果</span><span id="resolution">等待生成</span></figcaption><div class="frame"><span id="placeholder">正在准备第一张纹样…</span><img id="currentImage" alt="当前 QRP 纹样"></div></figure>
+      </div>
+      <div class="status-line" role="status"><span class="dot"></span><span id="status">正在连接本地生成器…</span></div>
+      <div class="bottom-row"><p id="viewHint">固定深蓝与米色。轮廓来自 QRP，不使用规则单元模板。</p><div class="exports"><button id="export" disabled>生成 1600px</button><a id="download" class="action disabled" download="qrp-pattern.png">下载 PNG</a></div></div>
+      <div class="footnote">研究原型 · 20×20 有限窗口 · Wang 铺砌由系统内部管理<br>当前输出不保证外边界周期对接，不作为可无缝重复印花单元。结构候选名称是视觉提示，并非风格分类结论。</div>
+    </section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    let config, result = null, committed = null, pinned = null, view = 'color', busy = false;
+    const inputs = new Map(), outputs = new Map();
+    const hints = {color:'固定深蓝与米色；几何距离控制留白和线宽。细颈可能保留，过度收缩会消去小单元。',coarse_gray:'直接 QRP 场 C：固定 [-1,1] 灰度；不随留白、线宽或填充方式改变。',mask:'黑色为实际绘制区域，白色为留白；与纹样共用同一轮廓和像素覆盖。'};
+    const snapshot = () => Object.fromEntries([...inputs].map(([key,input])=>[key,Number(input.value)]));
+    const same = (a,b) => b && config.controls.every(c=>a[c.key]===b[c.key]);
+    function validate(p) {
+      if (!p || typeof p !== 'object' || Object.keys(p).length !== config.controls.length) throw new Error('参数字段不完整或含有不支持的字段。');
+      for (const c of config.controls) {
+        const v=p[c.key];
+        if (typeof v!=='number'||!Number.isFinite(v)||(c.choices?!c.choices.includes(v):v<c.min||v>c.max)) throw new Error(`${c.label} 超出试调范围。`);
+      }
+    }
+    function refresh() {
+      const draft=snapshot(); let valid=true;
+      try { validate(draft); $('validation').textContent=''; } catch(e) { valid=false; $('validation').textContent=e.message; }
+      for (const c of config.controls) if (outputs.has(c.key)) outputs.get(c.key).textContent=`${draft[c.key]}${c.unit||''}`;
+      const dirty=!same(draft,committed);
+      $('apply').disabled=busy||!valid; $('export').disabled=busy||!result||dirty||!valid;
+      $('pin').disabled=busy||!result; $('import').disabled=busy;
+      document.querySelectorAll('.preset').forEach((b,i)=>{b.disabled=busy;b.classList.toggle('active',same(draft,config.presets[i].parameters));});
+      inputs.forEach((input,key)=>{input.disabled=busy||(key==='line_width'&&draft.drawing===0);});
+      $('currentLabel').textContent=dirty&&result?'当前结果 · 有未应用的修改':'当前结果';
+      $('apply').textContent=busy?'正在生成…':'应用参数 · 生成预览';
+      $('stage').classList.toggle('busy',busy);
+    }
+    function setDraft(parameters) {
+      validate(parameters);
+      inputs.forEach((input,key)=>{input.value=parameters[key];});
+      refresh();
+    }
+    function display() {
+      document.querySelectorAll('.tab[data-view]').forEach(b=>{const active=b.dataset.view===view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+      $('viewHint').textContent=hints[view];
+      if (result) {
+        $('currentImage').src=result.urls[view]; $('placeholder').hidden=true;
+        $('resolution').textContent=`${result.size} × ${result.size}`;
+        $('download').href=result.urls[view]; $('download').download=`qrp-${view}-${result.size}.png`; $('download').classList.remove('disabled');
+        $('save').href=result.recipe; $('save').classList.remove('disabled');
+      }
+      $('pinnedFigure').hidden=!pinned; $('canvases').classList.toggle('comparing',!!pinned);
+      if(pinned) $('pinnedImage').src=pinned.urls[view];
+    }
+    async function render(mode='preview') {
+      if(busy) return;
+      const parameters=mode==='export'?{...committed}:snapshot();
+      try {validate(parameters);} catch(e){$('validation').textContent=e.message;return;}
+      busy=true;refresh();$('status').classList.remove('error');$('status').textContent=mode==='export'?'按同一参数重新采样 1600px…':'正在生成纹样…';
+      try {
+        const response=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parameters,mode})});
+        const data=await response.json(); if(!response.ok) throw new Error(data.error||'生成失败');
+        result=data;committed={...data.parameters};display();
+        $('status').textContent=`已应用 · ${data.cached?'读取相同参数缓存':data.seconds+' 秒'} · 可切换灰度检查或保存参数`;
+      } catch(e) {$('status').textContent=e.message;$('status').classList.add('error');}
+      finally {busy=false;refresh();}
+    }
+    function addControl(c) {
+      const field=document.createElement('div');field.className='field';
+      const label=document.createElement('label');label.htmlFor=c.key;label.append(document.createTextNode(c.label));
+      const input=document.createElement(c.choices?'select':'input');input.id=c.key;input.setAttribute('aria-label',c.label);
+      if(c.choices) {c.choices.forEach((value,i)=>{const option=document.createElement('option');option.value=value;option.textContent=c.choice_labels?.[i]??String(value);input.append(option);});}
+      else {input.type='range';input.min=c.min;input.max=c.max;input.step=c.step;const output=document.createElement('output');label.append(output);outputs.set(c.key,output);}
+      input.value=c.default;input.addEventListener('input',refresh);inputs.set(c.key,input);field.append(label,input);
+      $(c.advanced?'advancedControls':'primaryControls').append(field);
+    }
+    $('apply').onclick=()=>render();$('export').onclick=()=>render('export');
+    document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;display();});
+    $('pin').onclick=()=>{pinned=result;$('pinInfo').textContent=`q=5 · 疏密=${committed.frequency} · 旋转=${committed.angle}° · 扩展=${committed.level} · 留白=${committed.inset} · ${committed.drawing?'线描':'面状'}`;display();};
+    $('unpin').onclick=()=>{pinned=null;display();};
+    $('import').onclick=()=>$('recipeFile').click();
+    $('recipeFile').onchange=async event=>{
+      try {
+        const file=event.target.files[0];if(!file)return;if(file.size>16384)throw new Error('请选择本工具保存的小型参数 JSON 文件。');
+        const recipe=JSON.parse(await file.text());
+        if(recipe.format!=='qrp-recipe'||recipe.version!==1||recipe.model!==config.model)throw new Error('不是 A 路线配方。旧方向实验配方仍可通过原 --render 命令复现，不会自动转换。');
+        setDraft(recipe.parameters);$('status').classList.remove('error');$('status').textContent='参数已载入草稿，请点击应用；当前图片尚未改变。';
+      } catch(e){$('status').textContent=e.message;$('status').classList.add('error');}
+      event.target.value='';
+    };
+    async function start() {
+      try {
+        const response=await fetch('/api/config');if(!response.ok)throw new Error('无法连接生成器');config=await response.json();
+        const order=['frequency','angle','level','inset','drawing','line_width','phase_a','phase_b'];
+        order.forEach(key=>addControl(config.controls.find(c=>c.key===key)));
+        for(const preset of config.presets){const button=document.createElement('button');button.className='preset';const title=document.createElement('strong');title.textContent=preset.name;const note=document.createElement('small');note.textContent=preset.note;button.append(title,note);button.onclick=()=>{setDraft(preset.parameters);render();};$('presets').append(button);}
+        refresh();await render();
+      }catch(e){$('status').textContent=`启动失败：${e.message}`;$('status').classList.add('error');}
+    }
+    start();
+  </script>
+</body>
+</html>

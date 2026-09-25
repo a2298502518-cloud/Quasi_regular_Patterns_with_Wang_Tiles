@@ -14,7 +14,9 @@ struct Color3 {
 
 class GradientPalette final {
 public:
-    [[nodiscard]] static GradientPalette createMidnightGold();
+    [[nodiscard]] static GradientPalette createMidnightGold(bool contourBands = true);
+    [[nodiscard]] static GradientPalette createInkCream(double level = 0.2);
+    [[nodiscard]] static GradientPalette createContourInk();
     [[nodiscard]] Color3 sample(double scalar) const noexcept;
 
 private:

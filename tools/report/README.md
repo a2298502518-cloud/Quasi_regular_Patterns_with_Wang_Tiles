@@ -1,6 +1,7 @@
 # 实验报告生成工具
 
-此目录保存当前《基于 QRP 与 Wangtile 的准规则纹样生成实验报告》的可复现源文件。
+此目录保存历史《基于 QRP 与 Wangtile 的准规则纹样生成实验报告》的可复现源文件。
+报告仍描述全局调制路径，不代表当前相位兼容独立瓦片方法。
 
 ## 前置条件
 
@@ -11,8 +12,9 @@
 - 已生成 `output/wang-qrp-experiment/A_coarse_parameter_family.png`。可先从项目根目录运行：
 
   ```powershell
-  cmake --build build --config Release --target qrp_wang_qrp_experiment
-  .\build\Release\qrp_wang_qrp_experiment.exe output\wang-qrp-experiment
+  cmake -S . -B build-legacy -DQRP_BUILD_LEGACY_EXPERIMENTS=ON -DQRP_BUILD_TESTS=OFF
+  cmake --build build-legacy --config Release --target qrp_legacy_experiment
+  .\build-legacy\Release\qrp_legacy_experiment.exe output\wang-qrp-experiment
   ```
 
 ## 生成步骤

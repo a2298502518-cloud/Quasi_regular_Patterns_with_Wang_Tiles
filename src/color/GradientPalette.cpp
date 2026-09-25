@@ -126,7 +126,7 @@ GradientPalette::GradientPalette(
     }
 }
 
-GradientPalette GradientPalette::createMidnightGold() {
+GradientPalette GradientPalette::createMidnightGold(const bool contourBands) {
     return GradientPalette({
         {0.00, linearRgbFromSrgb8(4, 8, 24)},
         {0.20, linearRgbFromSrgb8(15, 31, 58)},
@@ -134,7 +134,29 @@ GradientPalette GradientPalette::createMidnightGold() {
         {0.68, linearRgbFromSrgb8(210, 142, 45)},
         {0.86, linearRgbFromSrgb8(244, 211, 139)},
         {1.00, linearRgbFromSrgb8(255, 246, 219)},
-    }, ToneSettings{0.0, 2.10, 8.0, 0.10});
+    }, ToneSettings{0.0, 2.10, 8.0, contourBands ? 0.10 : 0.0});
+}
+
+GradientPalette GradientPalette::createInkCream(const double level) {
+    // 单一单调过渡只表达形状，不用反复色带制造额外的轮廓。
+    return GradientPalette({
+        {0.00, linearRgbFromSrgb8(24, 55, 67)},
+        {0.35, linearRgbFromSrgb8(24, 55, 67)},
+        {0.65, linearRgbFromSrgb8(241, 226, 193)},
+        {1.00, linearRgbFromSrgb8(241, 226, 193)},
+    }, ToneSettings{level, 5.0, 0.0, 0.0});
+}
+
+GradientPalette GradientPalette::createContourInk() {
+    // 只描绘 C=0 附近的一条等值带；不是独立细节场，也不是等物理宽度描边。
+    return GradientPalette({
+        {0.00, linearRgbFromSrgb8(24, 55, 67)},
+        {0.42, linearRgbFromSrgb8(24, 55, 67)},
+        {0.47, linearRgbFromSrgb8(241, 226, 193)},
+        {0.53, linearRgbFromSrgb8(241, 226, 193)},
+        {0.58, linearRgbFromSrgb8(24, 55, 67)},
+        {1.00, linearRgbFromSrgb8(24, 55, 67)},
+    }, ToneSettings{0.0, 3.0, 0.0, 0.0});
 }
 
 Color3 GradientPalette::sample(const double scalar) const noexcept {
