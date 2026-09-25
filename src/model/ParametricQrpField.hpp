@@ -2,7 +2,6 @@
 
 #include "math/Vec2.hpp"
 #include "model/ScalarFieldEvaluation.hpp"
-#include "model/WangContentWeight.hpp"
 
 #include <cstdint>
 #include <span>
@@ -10,13 +9,10 @@
 
 namespace qrp::model {
 
-struct ParametricWangQrpParameters {
+struct ParametricQrpParameters {
     std::uint32_t resonanceCount = 5;
     double spatialFrequency = 1.0;
     math::Vec2 globalPhase;
-    math::Vec2 wangPhase;
-    double weightCenter = 0.5;
-    double weightRadius = 0.4;
     double directionalBias = 0.0;
     // 旋转 QRP 载波方向；0 时偏置方向为 x，条带走向为 y。Wang 网格不旋转。
     double orientationRadians = 0.0;
@@ -27,7 +23,7 @@ struct ParametricWangQrpParameters {
     std::uint32_t phaseHarmonicOrder = 2;
 
     [[nodiscard]] bool operator==(
-        const ParametricWangQrpParameters&) const noexcept = default;
+        const ParametricQrpParameters&) const noexcept = default;
 };
 
 // QRP 的只读谱定义；相位兼容候选复用方向和振幅，不另写一套权重公式。
@@ -38,21 +34,20 @@ struct QrpMode {
     double amplitude = 0.0;
 };
 
-class ParametricWangQrpField final {
+class ParametricQrpField final {
 public:
-    explicit ParametricWangQrpField(ParametricWangQrpParameters parameters);
+    explicit ParametricQrpField(ParametricQrpParameters parameters);
 
-    [[nodiscard]] const ParametricWangQrpParameters& parameters() const noexcept;
+    [[nodiscard]] const ParametricQrpParameters& parameters() const noexcept;
     [[nodiscard]] std::span<const QrpMode> modes() const noexcept { return modes_; }
 
-    // position and weight.localGradient must use the same coordinate basis.
+    // position is in QRP model coordinates; Wang constraints belong to the tile layer.
     // Non-negative normalized mode weights give the range certificate [-1,1].
     [[nodiscard]] ScalarFieldEvaluation evaluate(
-        math::Vec2 position,
-        WangContentWeightEvaluation weight) const noexcept;
+        math::Vec2 position) const noexcept;
 
 private:
-    ParametricWangQrpParameters parameters_;
+    ParametricQrpParameters parameters_;
     std::vector<QrpMode> modes_;
 };
 

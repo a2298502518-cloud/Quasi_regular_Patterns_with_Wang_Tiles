@@ -1,4 +1,6 @@
 #include "TileStudyExport.hpp"
+#include "QrpSourceExport.hpp"
+#include <iostream>
 #include "color/InkCoverage.hpp"
 
 #include <iomanip>
@@ -18,6 +20,47 @@ TileStudyOutput::TileStudyOutput(const TileStudyRun& run, const std::filesystem:
     manifest_.exceptions(std::ios::badbit | std::ios::failbit);
     manifest_.open(directory_ / "manifest.json");
     writeHeader(run, modelName);
+}
+
+void TileStudyOutput::writeCase(const TileCase& recipe, const model::PhaseCompatibleQrpTiles& first,
+    const std::optional<model::PhaseCompatibleQrpTiles>& second, bool reference) {
+    const std::string style = recipe.name;
+    const qrp::model::QrpChannelComposition composition({recipe.relation});
+    const auto field = [&](const std::uint32_t id, const Vec2 p) {
+        const auto sample = first.evaluate(id,p);
+        return second ? composition.evaluate(sample,second->evaluate(id,p)) : sample;
+    };
+    const std::string id = "phase_" + style;
+    const auto caseDirectory = directory_ / id;
+    std::filesystem::create_directories(caseDirectory / "tiles");
+    std::vector<Image> library;
+    library.reserve(16);
+    for (std::uint32_t tile = 0; tile < 16; ++tile) {
+        library.push_back(fill(pixels_,pixels_,[&](const Vec2 p) { return field(tile,p); }));
+        qrp::exporting::writePng(library.back(),caseDirectory / "tiles" / ("tile_"+std::to_string(tile)+".png"));
+    }
+    qrp::exporting::writePng(assemble(library,a_),caseDirectory / "layout_A.png");
+    qrp::exporting::writePng(assemble(library,b_),caseDirectory / "layout_B.png");
+    {
+        // 类型 0 的四边均为 00，可合法自匹配；对照仍复制本案例的同一缓存。
+        auto repeated = a_;
+        std::fill(repeated.ids.begin(),repeated.ids.end(),0U);
+        qrp::exporting::writePng(assemble(library,repeated),caseDirectory / "repeat_0.png");
+    }
+    if (reference) {
+        const auto image = fill(a_.size*pixels_,pixels_,[&](const Vec2 p) {
+            const auto sample = first.source(p,{});
+            return second ? composition.evaluate(sample,second->source(p,{})) : sample;
+        });
+        qrp::exporting::writePng(image,directory_ / ("reference_"+style+".png"));
+    }
+    const double error = std::max(seamError(a_,field),seamError(b_,field));
+    beginCase(recipe, error);
+    writeQrpSource(first, manifest_);
+    if (second) { manifest_ << ','; writeQrpSource(*second, manifest_); }
+    manifest_ << "]}";
+    std::cout << "Reusable tile study: " << id
+        << "; 16 cached tiles; 2 layouts; seam error " << error << std::endl;
 }
 
 TileStudyOutput::Layout TileStudyOutput::makeLayout(const std::size_t size, const std::uint64_t seed, const std::size_t markedX, const std::size_t markedY) {
@@ -98,9 +141,9 @@ void TileStudyOutput::writeHeader(const TileStudyRun& run, const char* modelName
     manifest_ << "],\"cases\":[\n";
 }
 
-void TileStudyOutput::beginCase(const TileCase& recipe, const TileCaseOutput& options, const double error) {
+void TileStudyOutput::beginCase(const TileCase& recipe, const double error) {
     const std::string style = recipe.name;
-    const auto& selection = options.selection;
+    const std::string selection = "phase";
     const std::string id = selection + '_' + style;
     const model::QrpChannelCompositionParameters compositionParameters{recipe.relation};
     if (!firstCase_) manifest_ << ",\n";
@@ -112,12 +155,12 @@ void TileStudyOutput::beginCase(const TileCase& recipe, const TileCaseOutput& op
     manifest_ << ",\"label\":\"" << recipe.label << "\",\"featured\":"
         << (recipe.featured ? "true" : "false")
         << ",\"parent_style\":\"" << recipe.parentStyle << "\",\"child_style\":\"" << recipe.childStyle << '"';
-    if (options.periodicControl) manifest_ << ",\"periodic_control\":\"repeat_0.png\"";
+    manifest_ << ",\"periodic_control\":\"repeat_0.png\"";
     manifest_ << ",\"max_seam_error\":" << error << ",\"channels\":[";
 }
 
-void TileStudyOutput::finish(const std::string_view additionalRootFields) {
-    manifest_ << "\n]" << additionalRootFields << "}\n";
+void TileStudyOutput::finish() {
+    manifest_ << "\n]}\n";
     manifest_.close();
 }
 

@@ -10,9 +10,8 @@ namespace qrp::model {
 
 PhaseCompatibleQrpTiles::PhaseCompatibleQrpTiles(const PhaseCompatibleQrpTileParameters parameters)
     : parameters_(parameters), source_(parameters.qrp) {
-    if (!std::isfinite(parameters.sourceSpan) || parameters.sourceSpan <= 0.0
-        || parameters.qrp.wangPhase.x != 0.0 || parameters.qrp.wangPhase.y != 0.0) {
-        throw std::invalid_argument("Phase-compatible tiles require positive span and no global Wang modulation.");
+    if (!std::isfinite(parameters.sourceSpan) || parameters.sourceSpan <= 0.0) {
+        throw std::invalid_argument("Phase-compatible tiles require positive span.");
     }
     for (std::size_t i = 0; i < parameters.vertexOffsets.size(); ++i) {
         const auto offset = parameters.vertexOffsets[i], phase = parameters.vertexPhaseOffsets[i];
@@ -67,8 +66,7 @@ ScalarFieldEvaluation PhaseCompatibleQrpTiles::evaluate(const std::uint32_t id, 
 
 ScalarFieldEvaluation PhaseCompatibleQrpTiles::source(const math::Vec2 local, const math::Vec2 offset) const noexcept {
     const double span = parameters_.sourceSpan;
-    auto sample = source_.evaluate({span*local.x+offset.x,span*local.y+offset.y},
-        {parameters_.qrp.weightCenter,{}});
+    auto sample = source_.evaluate({span*local.x+offset.x,span*local.y+offset.y});
     sample.gradient.x *= span;
     sample.gradient.y *= span;
     return sample;

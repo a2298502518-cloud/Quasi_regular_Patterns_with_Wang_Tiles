@@ -270,9 +270,9 @@ python -X utf8 tools/joint_field_probe.py --source output/qrp-phase-tile-study
 线描是高度窄带，**不是等几何线宽**；没有后期贴纹、补缝、逐图归一化或 AI 生成图像。
 
 配方与精确波谱快照保存在 `tools/qrp_design_cases.json`。波谱和有限核对值由当前 C++ 核心的
-`ParametricWangQrpField` / `PhaseCompatibleQrpTiles` 实际导出，不在 Python 中新增 q 到波向量的生成公式。
+`ParametricWangQrpField`（现名 `ParametricQrpField`）/ `PhaseCompatibleQrpTiles` 实际导出，不在 Python 中新增 q 到波向量的生成公式。
 JSON 是固定实验输入，不是新的可编辑参数 API：其中的 q、频率等是来源记录，真正求值使用 `modes`；以后改变源参数必须从核心重新导出，不能只改记录字段。
-本次临时 C++ 导出程序位于忽略目录 `.codex-temp/design-source-export/`；生成过的谱快照足以重放本实验，不需要保留新的永久 C++ target。
+最初使用临时 C++ 导出程序；2026-09-25 多个实验共用后，序列化已归并到 `QrpSourceExport`，由 `qrp_export_sources` 统一导出。冻结谱快照仍可重放本实验。
 
 两个 2×2 布局固定为：A 下到上 `[6,9] / [9,14]`；B 下到上 `[5,8] / [9,6]`。
 相同类型 6、9 出现在不同布局/位置，A 中 9 还重复两次。布局符合边标签规则；这只是小窗口展示，不是非周期性证明。
@@ -437,12 +437,14 @@ q=5 仍使用原二阶构造。`commonPhase` 在偶数 q 的新配对下成为�
 `counterexample.png`（q=8 旧公式抵消）、`manifest.json`（12 组实际模态/显示配方/C++ 核对值）、`results.json`、
 每组 16 张瓦片、系数库及 A/B 铺砌。图板展示零相位、A 单轴和混合相位；B 单轴图像与测量没有丢弃。
 
-本机一次性研究编排位于忽略目录 `.codex-temp/design-source-export/`，从实际核心导出，再调用既有 Python 求解器；
-不是新生产入口，不进入默认构建，也没有把实验框架接入主程序。本机复跑命令：
+2026-09-25 清理后，相位编排已迁入受版本管理的 `tools/phase_response_study.py`；
+源导出由默认构建的 `qrp_export_sources` 提供，公共求解/显示移入 `tools/joint_field.py`。
+运行 `python -X utf8 tools/phase_response_study.py` 即可从源重算，不再依赖临时目录或旧系数缓存。
+工程迁移不改变本节配方和结论；命令及依赖见 [研究工具](../tools/README.md)。
 
 ```powershell
-cmake --build .codex-temp/design-source-export/build --config Release
-.\.codex-temp\joint-field-venv\Scripts\python.exe -X utf8 .codex-temp/design-source-export/phase_probe.py
+cmake --build build --config Release
+python -X utf8 tools/phase_response_study.py
 ```
 
 临时编排不随 Git 源码分发；新环境需要按第 11.3 节参数重新导出，或使用该输出目录已保存的精确模式快照。

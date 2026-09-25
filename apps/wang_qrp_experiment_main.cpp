@@ -8,8 +8,7 @@ namespace {
 void usage() {
     std::cout << "Usage: qrp_wang_qrp_experiment --study phase|organization|retiling [directory] [pixels/tile]\n"
               << "       qrp_wang_qrp_experiment --help\n"
-              << "Current path: QRP phase-compatible fixed tiles -> legal Wang layouts.\n"
-              << "Historical global/source studies: enable QRP_BUILD_LEGACY_EXPERIMENTS, then use qrp_legacy_experiment.\n";
+              << "QRP phase-compatible baseline -> legal Wang layouts.\n";
 }
 } // namespace
 
@@ -19,16 +18,11 @@ int main(const int argc, char** argv) {
             usage();
             return 0;
         }
-        std::string study;
-        int directoryIndex = 2;
-        const std::string_view mode(argv[1]);
-        if (mode == "--study" && argc > 2) {
-            study = argv[2];
-            directoryIndex = 3;
-        } else if (mode == "--phase-tile-study") study = "phase";
-        else if (mode == "--organization-tile-study") study = "organization";
-        else if (mode == "--retiling-study") study = "retiling";
-        else throw std::invalid_argument("Unknown command; use --help. Historical studies moved to qrp_legacy_experiment.");
+        if (std::string_view(argv[1]) != "--study" || argc < 3) {
+            throw std::invalid_argument("Expected --study phase|organization|retiling; use --help.");
+        }
+        const std::string study = argv[2];
+        constexpr int directoryIndex = 3;
         if (argc > directoryIndex + 2) throw std::invalid_argument("Studies accept directory and pixels/tile only.");
         std::optional<std::size_t> pixels;
         if (argc > directoryIndex + 1) {

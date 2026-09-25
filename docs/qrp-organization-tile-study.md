@@ -135,8 +135,8 @@ q=5 的五个无向轴最小间隔为 36°，而 `2 arcsin(0.25)≈28.96°<36°`
 ```powershell
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
-.\build\Release\qrp_wang_qrp_experiment.exe --phase-tile-study
-.\build\Release\qrp_wang_qrp_experiment.exe --organization-tile-study
+.\build\Release\qrp_wang_qrp_experiment.exe --study phase
+.\build\Release\qrp_wang_qrp_experiment.exe --study organization
 python tools\build_tile_board.py output\qrp-organization-tile-study --previous output\qrp-phase-tile-study
 ```
 

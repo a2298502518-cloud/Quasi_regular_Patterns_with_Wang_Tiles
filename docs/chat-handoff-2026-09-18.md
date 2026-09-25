@@ -1,5 +1,7 @@
 # 项目交接记录（2026-09-18）
 
+> 历史阶段记录：旧代码与命令已归档至 `b58337a`，见 [恢复说明](legacy-experiments.md)。当前入口见 [README](../README.md)。
+
 **09-23 工程整理：当前状态和运行入口以 [README](../README.md) 为准。**
 默认程序现为配方驱动的相位兼容瓦片研究，旧全局场和来源混合入口移至可选的
 `qrp_legacy_experiment`；复现命令迁移见 [历史实验](legacy-experiments.md)。

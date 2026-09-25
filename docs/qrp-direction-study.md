@@ -1,5 +1,7 @@
 # QRP 方向扩展与可试调原型
 
+> 历史阶段记录：旧代码与命令已归档至 `b58337a`，见 [恢复说明](legacy-experiments.md)。当前入口见 [README](../README.md)。
+
 这是方向研究阶段的历史记录。当前已转向 [A 路线造型诊断](qrp-contour-study.md)，
 旧 `directional-qrp-v1` 配方及下文 `--render` 语义保留，不自动转换为新模型。
 用户明确当前重点是生成方法与造型，不是试调台。

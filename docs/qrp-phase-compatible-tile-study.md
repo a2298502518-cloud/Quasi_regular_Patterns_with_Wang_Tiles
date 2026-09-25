@@ -171,7 +171,7 @@ e\cdot\nabla\Psi_*\ge m=
 ```powershell
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
-.\build\Release\qrp_wang_qrp_experiment.exe --phase-tile-study
+.\build\Release\qrp_wang_qrp_experiment.exe --study phase
 python tools\build_tile_board.py output\qrp-phase-tile-study --previous output\qrp-tile-study
 ```
 

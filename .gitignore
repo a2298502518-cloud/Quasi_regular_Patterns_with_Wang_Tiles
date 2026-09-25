@@ -20,7 +20,8 @@ compile_commands.json
 *.log
 
 # Report generator caches and intermediates
-/tools/__pycache__/
+__pycache__/
+/.venv/
 /tools/report/node_modules/
 /tools/report/__pycache__/
 /tools/report/method-flow.png

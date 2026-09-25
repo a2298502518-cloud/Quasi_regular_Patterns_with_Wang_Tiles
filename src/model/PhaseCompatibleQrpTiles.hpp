@@ -1,13 +1,13 @@
 #pragma once
 
-#include "model/ParametricWangQrpField.hpp"
+#include "model/ParametricQrpField.hpp"
 
 #include <array>
 
 namespace qrp::model {
 
 struct PhaseCompatibleQrpTileParameters {
-    ParametricWangQrpParameters qrp;
+    ParametricQrpParameters qrp;
     double sourceSpan = 4.0;
     std::array<math::Vec2, 2> vertexOffsets{{{0.2, 0.3}, {0.9, 0.4}}};
     // 内部状态可编码 QRP 的 (A,B) 相对相位，而不局限于源坐标平移；默认保持旧库。
@@ -46,7 +46,7 @@ public:
 
 private:
     PhaseCompatibleQrpTileParameters parameters_;
-    ParametricWangQrpField source_;
+    ParametricQrpField source_;
     std::vector<CompatibleQrpMode> modes_;
     std::array<std::array<double, 4>, 16> corners_;
 };

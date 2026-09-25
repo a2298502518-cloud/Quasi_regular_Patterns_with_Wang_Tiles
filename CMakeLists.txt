@@ -8,7 +8,6 @@ project(
 )
 
 option(QRP_BUILD_TESTS "Build the Wang-QRP numerical tests" ON)
-option(QRP_BUILD_LEGACY_EXPERIMENTS "Build historical global-field and source-mixing experiments" OFF)
 
 include(FetchContent)
 
@@ -33,7 +32,7 @@ function(qrp_enable_warnings target)
 endfunction()
 
 add_library(qrp_wang_qrp_core STATIC
-    src/model/ParametricWangQrpField.cpp
+    src/model/ParametricQrpField.cpp
     src/model/PhaseCompatibleQrpTiles.cpp
     src/model/QrpChannelComposition.cpp
 )
@@ -43,19 +42,6 @@ target_include_directories(qrp_wang_qrp_core
 )
 target_compile_features(qrp_wang_qrp_core PUBLIC cxx_std_20)
 qrp_enable_warnings(qrp_wang_qrp_core)
-
-# 历史模型仍用于必要对照和测试，但不再进入当前实验程序的链接依赖。
-if(QRP_BUILD_TESTS OR QRP_BUILD_LEGACY_EXPERIMENTS)
-    add_library(qrp_research_baselines STATIC
-        src/model/HierarchicalQrpComposition.cpp
-        src/model/OrderedQrpField.cpp
-        src/model/ReusableQrpTiles.cpp
-        src/model/WangContentWeight.cpp
-        src/model/WangGrid.cpp
-    )
-    target_link_libraries(qrp_research_baselines PUBLIC qrp_wang_qrp_core)
-    qrp_enable_warnings(qrp_research_baselines)
-endif()
 
 add_library(qrp_raster STATIC
     src/color/InkCoverage.cpp
@@ -67,13 +53,6 @@ target_include_directories(qrp_raster
 )
 target_compile_features(qrp_raster PUBLIC cxx_std_20)
 qrp_enable_warnings(qrp_raster)
-
-# 轮廓路径保留单元测试；旧色带只服务历史实验，不进入当前程序的构建依赖。
-if(QRP_BUILD_TESTS OR QRP_BUILD_LEGACY_EXPERIMENTS)
-    add_library(qrp_contour_geometry STATIC src/render/ContourGeometry.cpp)
-    target_link_libraries(qrp_contour_geometry PUBLIC qrp_raster)
-    qrp_enable_warnings(qrp_contour_geometry)
-endif()
 
 add_library(qrp_png STATIC
     src/export/PngWriter.cpp
@@ -91,6 +70,15 @@ target_link_libraries(qrp_png
 target_compile_features(qrp_png PUBLIC cxx_std_20)
 qrp_enable_warnings(qrp_png)
 
+add_library(qrp_source_export STATIC apps/QrpSourceExport.cpp)
+target_include_directories(qrp_source_export PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/apps")
+target_link_libraries(qrp_source_export PUBLIC qrp_wang_qrp_core)
+qrp_enable_warnings(qrp_source_export)
+
+add_executable(qrp_export_sources apps/export_sources_main.cpp)
+target_link_libraries(qrp_export_sources PRIVATE qrp_source_export)
+qrp_enable_warnings(qrp_export_sources)
+
 add_library(qrp_tile_study STATIC
     apps/TileStudyRecipes.cpp
     apps/TileStudyExport.cpp
@@ -98,6 +86,7 @@ add_library(qrp_tile_study STATIC
 target_include_directories(qrp_tile_study PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/apps")
 target_link_libraries(qrp_tile_study
     PUBLIC
+        qrp_source_export
         qrp_png
         qrp_raster
         qrp_wang_qrp_core
@@ -110,17 +99,6 @@ add_executable(qrp_wang_qrp_experiment
 )
 target_link_libraries(qrp_wang_qrp_experiment PRIVATE qrp_tile_study)
 qrp_enable_warnings(qrp_wang_qrp_experiment)
-
-if(QRP_BUILD_LEGACY_EXPERIMENTS)
-    add_executable(qrp_legacy_experiment
-        apps/legacy/global_studies_main.cpp
-        apps/legacy/DirectQrpDesign.cpp
-        apps/legacy/SourceTileStudy.cpp
-        src/color/GradientPalette.cpp
-    )
-    target_link_libraries(qrp_legacy_experiment PRIVATE qrp_tile_study qrp_research_baselines qrp_contour_geometry)
-    qrp_enable_warnings(qrp_legacy_experiment)
-endif()
 
 if(QRP_BUILD_TESTS)
     enable_testing()

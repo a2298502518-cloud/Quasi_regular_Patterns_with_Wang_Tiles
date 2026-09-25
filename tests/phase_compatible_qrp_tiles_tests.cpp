@@ -1,4 +1,3 @@
-#include "model/ReusableQrpTiles.hpp"
 #include "model/EndpointWangTiles.hpp"
 #include "model/PhaseCompatibleQrpTiles.hpp"
 #include "model/QrpChannelComposition.hpp"
@@ -22,44 +21,6 @@ void same(const ScalarFieldEvaluation a, const ScalarFieldEvaluation b, const do
     near(a.gradient.y, b.gradient.y, tolerance, "dy mismatch");
 }
 
-void check(const QrpSourceSelection selection) {
-    ReusableQrpTileParameters p;
-    p.qrp.spatialFrequency = 3.15;
-    p.qrp.directionalBias = 0.7;
-    p.qrp.orientationRadians = 0.19;
-    p.qrp.commonPhase = 0.2;
-    p.selection = selection;
-    const ReusableQrpTiles tiles(p);
-    std::size_t vertical = 0, horizontal = 0;
-    // 检查全部 16×16 类型对中的合法邻接，不借用同一个全局坐标。
-    for (std::uint32_t a = 0; a < 16; ++a) for (std::uint32_t b = 0; b < 16; ++b) {
-        const auto left = EndpointWangTiles::labels(a), right = EndpointWangTiles::labels(b);
-        for (const double t : {0.0, 0.03, 0.13, 0.5, 0.87, 0.97, 1.0}) {
-            if (left.east == right.west) same(tiles.evaluate(a, {1,t}), tiles.evaluate(b, {0,t}), 2.0e-12);
-            if (left.north == right.south) same(tiles.evaluate(a, {t,1}), tiles.evaluate(b, {t,0}), 2.0e-12);
-        }
-        vertical += left.east == right.west;
-        horizontal += left.north == right.south;
-    }
-    if (vertical != 64 || horizontal != 64) throw std::runtime_error("restricted tile-set adjacency count");
-    for (std::uint32_t id = 0; id < 16; ++id) {
-        const Vec2 interior{0.37,0.52};
-        same(tiles.evaluate(id, interior), tiles.source(interior, tiles.sources().interiors[id]), 1.0e-14);
-        for (int y = 0; y <= 8; ++y) for (int x = 0; x <= 8; ++x) {
-            const double value = tiles.evaluate(id, {x/8.0,y/8.0}).value;
-            if (!std::isfinite(value) || std::abs(value) > 1.0 + 1.0e-14) throw std::runtime_error("convex range");
-        }
-    }
-    constexpr double h = 1.0e-6;
-    // 位于两条过渡带的交叠处，覆盖权重导数，不能只测内部。
-    const Vec2 q{0.08,0.91};
-    const auto sample = tiles.evaluate(6,q);
-    near(sample.gradient.x, (tiles.evaluate(6,{q.x+h,q.y}).value - tiles.evaluate(6,{q.x-h,q.y}).value)/(2*h), 1.0e-7, "transition dx");
-    near(sample.gradient.y, (tiles.evaluate(6,{q.x,q.y+h}).value - tiles.evaluate(6,{q.x,q.y-h}).value)/(2*h), 1.0e-7, "transition dy");
-    if (tiles.fit().edgeSelected > tiles.fit().edgeFixed + 1.0e-12
-        || tiles.fit().interiorSelected > tiles.fit().interiorFixed + 1.0e-12) throw std::runtime_error("source fit regressed");
-}
-
 void checkPhaseCompatible() {
     PhaseCompatibleQrpTileParameters p;
     p.qrp.spatialFrequency = 3.15;
@@ -67,7 +28,7 @@ void checkPhaseCompatible() {
     p.qrp.orientationRadians = 0.19;
     p.qrp.commonPhase = 0.2;
     const PhaseCompatibleQrpTiles tiles(p);
-    const ParametricWangQrpField reference(p.qrp);
+    const ParametricQrpField reference(p.qrp);
     for (std::size_t i = 0; i < tiles.modes().size(); ++i) {
         near(tiles.modes()[i].amplitude,reference.modes()[i].amplitude,0,"mode amplitude changed");
     }
@@ -111,8 +72,8 @@ void checkNestedCompatible(const bool relativePhase, const std::uint32_t resonan
         auto expectedParameters = p.qrp;
         expectedParameters.globalPhase.x += p.vertexPhaseOffsets[state].x;
         expectedParameters.globalPhase.y += p.vertexPhaseOffsets[state].y;
-        auto expected = ParametricWangQrpField(expectedParameters).evaluate(
-            p.vertexOffsets[state], {p.qrp.weightCenter,{}});
+        auto expected = ParametricQrpField(expectedParameters).evaluate(
+            p.vertexOffsets[state]);
         expected.gradient.x *= p.sourceSpan;
         expected.gradient.y *= p.sourceSpan;
         same(parent.evaluate(15*state,{double(state),double(state)}),expected,1.0e-10);
@@ -155,14 +116,12 @@ void checkNestedCompatible(const bool relativePhase, const std::uint32_t resonan
 
 int main() {
     try {
-        check(QrpSourceSelection::Fixed);
-        check(QrpSourceSelection::BoundaryMatched);
         checkPhaseCompatible();
         checkNestedCompatible(false);
         checkNestedCompatible(true);
         checkNestedCompatible(true,8,3);
         checkNestedCompatible(true,12,3);
-        std::cout << "Reusable tiles: legal edges, full gradients, interior recovery, range and source fit passed\n";
+        std::cout << "Phase-compatible tiles: legal edges, full gradients, range and composition passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

@@ -1,0 +1,4 @@
+# Numerical/image stack used for the recorded research runs (Python >= 3.11).
+numpy==2.3.5
+scipy==1.16.3
+Pillow==12.3.0

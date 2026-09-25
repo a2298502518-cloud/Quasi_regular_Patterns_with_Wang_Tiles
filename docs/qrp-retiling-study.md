@@ -129,7 +129,7 @@
 ```powershell
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
-.\build\Release\qrp_wang_qrp_experiment.exe --retiling-study
+.\build\Release\qrp_wang_qrp_experiment.exe --study retiling
 python tools\build_tile_board.py output\qrp-retiling-study --previous output\qrp-organization-tile-study\resolved-scale
 ```
 

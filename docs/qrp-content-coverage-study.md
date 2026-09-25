@@ -33,7 +33,7 @@ G_p(u,v)=F_\psi(16u-8+c_{p,x},\ 16v-8+c_{p,y}).
 候选目标不再含旧的 `Sₜ` 平滑形变，也不含逐模态整数闭合；投影前是原始 QRP 场的局部限制。
 投影后的场则是相容近似，不能再称为未经改变的原始场。
 
-全部波向量、振幅、相位和核对样本由实际 C++ `ParametricWangQrpField` / `PhaseCompatibleQrpTiles` 导出。
+全部波向量、振幅、相位和核对样本由实际 C++ `ParametricQrpField`（清理前名为 `ParametricWangQrpField`）/ `PhaseCompatibleQrpTiles` 导出。
 临时导出器把两个顶点源偏移设为同一个源位置，因此 `vertex_shift=0`；Python 仍只解释序列化模态，不重新实现 q 到模态的定义。
 
 共同配置：
@@ -182,16 +182,20 @@ q=8 混合相位在边界邻域出现最小值 −1.016876，再次表明当前�
 旧默认三组的原始/闭合场核对差仍为 2.31×10⁻¹⁴，基线 RMSE 与已有记录完全一致；本轮基线 PNG 直接复用原缓存。
 生产 C++ 未改动，因此没有再跑无关的全量构建或重复防御测试；只重新构建用于实际导出的临时程序，并运行上述研究与分派核对。
 
-本机一次性编排位于忽略目录 `.codex-temp/design-source-export/coverage_probe.py`：
+2026-09-25 工程清理后，编排已收敛到受版本管理的 `tools/content_coverage_study.py`，
+C++ 源导出并入 `qrp_export_sources`，复用 `QrpSourceExport` 序列化。
+覆盖基线现在也从源重新求解，不再要求本机存在旧 PNG / 系数库；原始实验结果不因这项工程迁移而重写。
 
 ```powershell
-cmake --build .codex-temp/design-source-export/build --config Release
-.\.codex-temp\joint-field-venv\Scripts\python.exe -X utf8 .codex-temp/design-source-export/coverage_probe.py
-.\.codex-temp\joint-field-venv\Scripts\python.exe -X utf8 .codex-temp/design-source-export/coverage_probe.py --phase-transfer
+cmake --build build --config Release
+python -m pip install -r tools/requirements.txt
+python -X utf8 tools/content_coverage_study.py
+python -X utf8 tools/content_coverage_study.py --phase-transfer
 ```
 
-编排不随 Git 源码分发，新环境需按本记录的明确配方重导出，或取保存的精确模式快照重放。
-`--manifest-only` 只重新组织生成清单，不代表重跑数值或图像验证。
+自定义零相位目录用 `--zero-phase-output` 传给第二条命令；源导出路径和字体可显式指定，见 [工具说明](../tools/README.md)。
+类型分配仍冻结，求解器、配方及显示不变；相位响应测量直接写入 `phase_response.json`。
+移除了只重排元数据的临时 `--manifest-only` 入口，防止与完整实验混淆。
 
 输出：
 

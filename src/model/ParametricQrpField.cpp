@@ -1,4 +1,4 @@
-#include "model/ParametricWangQrpField.hpp"
+#include "model/ParametricQrpField.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,8 +7,8 @@
 
 namespace qrp::model {
 
-ParametricWangQrpField::ParametricWangQrpField(
-    const ParametricWangQrpParameters parameters)
+ParametricQrpField::ParametricQrpField(
+    const ParametricQrpParameters parameters)
     : parameters_(parameters) {
     const auto finite = [](const math::Vec2 value) {
         return std::isfinite(value.x) && std::isfinite(value.y);
@@ -17,10 +17,6 @@ ParametricWangQrpField::ParametricWangQrpField(
         || !std::isfinite(parameters_.spatialFrequency)
         || parameters_.spatialFrequency <= 0.0
         || !finite(parameters_.globalPhase)
-        || !finite(parameters_.wangPhase)
-        || !std::isfinite(parameters_.weightCenter)
-        || !std::isfinite(parameters_.weightRadius)
-        || parameters_.weightRadius <= 0.0
         || !std::isfinite(parameters_.directionalBias)
         || parameters_.directionalBias < 0.0
         || !std::isfinite(parameters_.orientationRadians)
@@ -29,8 +25,8 @@ ParametricWangQrpField::ParametricWangQrpField(
         || (parameters_.phaseHarmonicOrder != 2 && parameters_.phaseHarmonicOrder != 3)
         || parameters_.crossMix < 0.0 || parameters_.crossMix > 1.0) {
         throw std::invalid_argument(
-            "Parametric Wang-QRP parameters require q >= 5, finite phases, "
-            "positive frequency/radius, finite non-negative bias, finite orientation, crossMix in [0,1], "
+            "Parametric QRP parameters require q >= 5, finite phases, "
+            "positive frequency, finite non-negative bias, finite orientation, crossMix in [0,1], "
             "and phase harmonic order 2 or 3.");
     }
 
@@ -76,16 +72,12 @@ ParametricWangQrpField::ParametricWangQrpField(
     }
 }
 
-const ParametricWangQrpParameters& ParametricWangQrpField::parameters() const noexcept {
+const ParametricQrpParameters& ParametricQrpField::parameters() const noexcept {
     return parameters_;
 }
 
-ScalarFieldEvaluation ParametricWangQrpField::evaluate(
-    const math::Vec2 position,
-    const WangContentWeightEvaluation weight) const noexcept {
-    const double inverseRadius = 1.0 / parameters_.weightRadius;
-    const double normalizedWeight = (weight.value - parameters_.weightCenter)
-        * inverseRadius;
+ScalarFieldEvaluation ParametricQrpField::evaluate(
+    const math::Vec2 position) const noexcept {
     ScalarFieldEvaluation result;
 
     for (const auto& mode : modes_) {
@@ -93,24 +85,16 @@ ScalarFieldEvaluation ParametricWangQrpField::evaluate(
         const double waveY = mode.direction.y;
         const double harmonicX = mode.phaseHarmonic.x;
         const double harmonicY = mode.phaseHarmonic.y;
-        const double wangHarmonic = parameters_.wangPhase.x * harmonicX
-            + parameters_.wangPhase.y * harmonicY;
         const double phase = parameters_.spatialFrequency
                 * (waveX * position.x + waveY * position.y)
             + parameters_.globalPhase.x * harmonicX
             + parameters_.globalPhase.y * harmonicY
-            + normalizedWeight * wangHarmonic
             + parameters_.commonPhase;
         const double derivative = -std::sin(phase) * mode.amplitude;
-        const double weightDerivative = wangHarmonic * inverseRadius;
 
         result.value += std::cos(phase) * mode.amplitude;
-        result.gradient.x += derivative
-            * (parameters_.spatialFrequency * waveX
-                + weightDerivative * weight.localGradient.x);
-        result.gradient.y += derivative
-            * (parameters_.spatialFrequency * waveY
-                + weightDerivative * weight.localGradient.y);
+        result.gradient.x += derivative * (parameters_.spatialFrequency * waveX);
+        result.gradient.y += derivative * (parameters_.spatialFrequency * waveY);
     }
     return result;
 }
