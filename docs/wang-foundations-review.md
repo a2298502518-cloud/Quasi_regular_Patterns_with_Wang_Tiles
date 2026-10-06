@@ -264,7 +264,7 @@ W6 的自相似结构和 W7 的环面旋转 / Markov 分割提供了真实反例
 
 对一个合法左右邻接，同一高度的两侧 S 值及切向导数相同，法向导数因 h′(0)=h′(1)=0 为零。两侧 Φ 只差 2πn_rx，且相位梯度一致，因而每条余弦模态的值与梯度一致。固定模态系数的和仍一致。竖直边同理。
 
-这是一种明确的**充分构造**，不是 Wang 强制要求每条波的相位绕整圈，也不是完整内容模型的唯一解。整数绕数改变时的调参跳变，旧 [相位兼容研究第 7 节](qrp-phase-compatible-tile-study.md) 已记录；上轮 QRP 报告新增的是反例，本轮已纠正“新发现”的标题。
+这是一种明确的**充分构造**，不是 Wang 强制要求每条波的相位绕整圈，也不是完整内容模型的唯一解。整数绕数改变时的调参跳变，旧 [相位兼容研究第 7 节](history/qrp-phase-compatible-tile-study.md) 已记录；上轮 QRP 报告新增的是反例，本轮已纠正“新发现”的标题。
 
 ### 8.2 我们需要撤回或限制的观点
 
@@ -361,4 +361,4 @@ python tools/wang_foundations_probe.py
 - **[P1]** Maxim Gumin, [WaveFunctionCollapse](https://github.com/mxgmn/WaveFunctionCollapse)；[SimpleTiledModel.cs](https://github.com/mxgmn/WaveFunctionCollapse/blob/master/SimpleTiledModel.cs)；[Model.cs](https://github.com/mxgmn/WaveFunctionCollapse/blob/master/Model.cs)。读取日期上的 master 内容，不作为锁定版本的依赖。
 - **[P2]** Sean Barrett 等，[stb_herringbone_wang_tile.h](https://github.com/nothings/stb/blob/master/stb_herringbone_wang_tile.h)。同样仅阅读相关构造，不引用未经本轮核验的性能或质量保证。
 
-本项目对照入口：[QRP 调研](qrp-foundations-review.md)、[相位兼容研究](qrp-phase-compatible-tile-study.md)、[重铺与相对相位状态](qrp-retiling-study.md)。旧文档保留为历史证据，不因为本轮重新理解概念就把旧实验全部删除或默认沿用。
+本项目对照入口：[QRP 调研](qrp-foundations-review.md)、[相位兼容研究](history/qrp-phase-compatible-tile-study.md)、[重铺与相对相位状态](history/qrp-retiling-study.md)。旧文档保留为历史证据，不因为本轮重新理解概念就把旧实验全部删除或默认沿用。

@@ -7,7 +7,10 @@ compile_commands.json
 
 # IDE and platform-local files
 /.vs/
-/.vscode/
+/.vscode/*
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
 *.user
 *.suo
 
@@ -17,16 +20,15 @@ compile_commands.json
 /tmp/
 /.codex-temp/
 /.cache/
+/删除区_*/
 *.log
 
-# Report generator caches and intermediates
+# Python caches and local environment
 __pycache__/
 /.venv/
-/tools/report/node_modules/
-/tools/report/__pycache__/
-/tools/report/method-flow.png
-/tools/report/equations/*.png
-/tools/report/equations/manifest.json
+
+# Historical cache recipes are local generated data, not source code.
+/docs/history/workbench-recipes/
 
 # Local research library
 # Third-party PDFs are kept for personal research and are not redistributed

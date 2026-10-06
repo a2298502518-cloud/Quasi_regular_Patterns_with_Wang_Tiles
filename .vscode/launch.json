@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "QRP C++ / OpenGL 操作台",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/Debug/qrp_workbench.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "QRP: build native Debug",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "QRP Python 数值参考",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/motif_connection_study.py",
+      "python": "${workspaceFolder}/.codex-temp/joint-field-venv/Scripts/python.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

@@ -1,60 +1,63 @@
-# 当前验证与清理记录
+# 当前验证范围
 
-## 当前范围
+当前只维护 relational 直接公式路线，正式核心位于 `src/qrp/Field.*`，原生入口为 `qrp_workbench` / `qrp_generate`。
+`tools/wang_qrp.py` 与其 Python CLI 保留为冻结数值参考，不是原生程序后台。
+旧桌面/C++/拟合/图册测试已随其代码归档，不再用旧测试数量证明当前方法。
 
-验证对象是 QRP 谱、相位兼容 C++ 对照，以及 Python 共享边界联合拟合研究。
-原七组测试的历史依据保留在 [历史验证记录](validation-history.md)；旧代码见 [恢复说明](legacy-experiments.md)。
-不为已退出工作目录的模型继续维护测试，也不把数值回归当成审美或论文结论。
+理论与数值边界见[论文核心](qrp-bounded-connection-paper-core.md)和[推导记录](qrp-structured-atlas-study.md)。
+原始证据保持原路径：
 
-## 必要检查
+- [代表样例](../output/qrp-motif-connection-relational/results.json)
+- [复用、独立求值与一般 Q](../output/qrp-motif-connection-relational/verification.json)
+- [新参数样例](../output/qrp-motif-connection-new-parameters/results.json)
+
+C² 和有限尺寸存在性来自推导，不靠截图或采样证明；数值一致也不等于审美保证。
+
+## 当前原生必要检查
 
 ```powershell
-cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
+./tools/native.ps1 -Action test
+./build/Release/qrp_workbench.exe --smoke --capture output/native-migration-check/原生操作台.png
 ```
 
-当前三组 CTest：
+一个 CTest 入口覆盖三组输入的完整目录边迹、保护核心、梯度、解析界和布局扩幅。
+OpenGL smoke 在隐藏窗口中实际运行公式生成、纹理上传、ImGui 绘制、截图及 PNG 保存，不调用 Python。
+窗口缩放、拖拽、草稿编辑、Apply 和高清按钮的完整鼠标操作仍需人工验收；不把 smoke 冒称完整交互测试。
 
-- `qrp_canonical_qrp_tests`：独立参考公式、对称性、坐标与梯度。
-- `qrp_parametric_qrp_field_tests`：源场恢复、解析梯度、方向旋转、幅度界、相位基语义、通道组合。
-- `qrp_phase_compatible_qrp_tiles_tests`：合法边接值/全梯度、相位状态恢复、方向证书、父子组合。
+## C++ 迁移对照
 
-Python 实验本身核对 C++ oracle、所有 128 个合法有序边对和纯像素复用。
-拟合误差在独立于求解积分点的采样上测量；固定配色和阈值，不按图归一化或裁剪场值。
-共享自由度的连续性依据见 [联合拟合研究](qrp-joint-field-study.md)，不能只靠截图声称 C¹。
+```powershell
+./.codex-temp/joint-field-venv/Scripts/python.exe -X utf8 tests/compare_native.py
+# 额外只核对一组已有高清图，而非重新输出全部交付
+./.codex-temp/joint-field-venv/Scripts/python.exe -X utf8 tests/compare_native.py --hd
+```
 
-## 2026-09-25 清理回归
+8 组输入：Q4.8 三次方向、Q5.5/6/7/8/12 基础方向，以及 Q7 非零偏移的显式/自动区域。
+选区、认证关系、整数支、W/H、解析界和两种布局与参考一致；24 张 288×288 PNG 的 RGB 像素数组一致。
+采样场值/梯度最大差异约 1.64e−13；这是有限参数对照，不是对所有参数的位级等价证明。
+Q7 三张 4608×4608 原生图与原高清交付的 RGB 像素数组一致，固定 RGB8、sRGB 标记及 300 DPI。
+PNG 压缩及元数据形式可不同，不宣称文件 SHA-256 与旧导出相同。
 
-清理前完整源码保存为 `b58337a`，当时 Release 构建和七组 CTest 通过。
-清理后默认 Release 构建、三组 CTest，以及关闭测试的新目录独立构建均通过。
-独立构建复用本机固定版本的 lodepng 源码；没有额外验证全新网络下载。
+迁移程序运行不依赖 Python；上面的 Python 环境只用于开发阶段的独立参考比较。
+Release / Debug 构建、原生 CTest 和实际 OpenGL smoke 已执行；详细限制见[迁移记录](native-migration-2026-10-06.md)。
 
-在相同机器、参数、分辨率和数值依赖下重新生成并比较 SHA-256：
+## Python 参考检查
 
-| 结果 | 完全相同的 PNG 数量 |
-| --- | ---: |
-| C++ 相位对照，两种跨度，基础 64px/瓦片 | 120 |
-| 已认可三组设计，384px/瓦片 | 72 |
-| 16 源块覆盖与分配，9 套库 | 228 |
-| 固定分配后的混合相位，3 套库 | 76 |
-| QRP 相位响应，12 套库 | 231 |
-| 合计 | 727 |
+```powershell
+./.codex-temp/joint-field-venv/Scripts/python.exe -X utf8 tests/current_pipeline_tests.py -v
+```
 
-Python 的 27 套系数及自由度映射数组逐元素完全一致；各案例数值指标一致。
-覆盖实验的三个基线原先直接读取缓存，残差记录为 null；现在重算并记录实际残差，这是预期的元数据差异。
-源清单新增统一导出的方向证书，因此不要求新旧清单的文件哈希相等；实际模态、系数和图像保持不变。
-固定分配的 `phase_response.json` 与原结果完全一致。
+3 项检查：非整数/三次方向源梯度，当前场的接边和保护区，独立/缓存像素一致与固定尺度扩幅。
+CLI 生成还会核对合法布局、梯度/关系、复用、局部修改和扩幅。
+不为已退出路线继续维护测试，也不增加大量防御性参数扫描。
 
-另运行既有 Hermite 双三次值/梯度核对（最大差 4.00×10⁻¹⁵）、QRP 文献公式与 Wang 有限组合探针。
-C++ 图板核对 480 个合法布局实例及 240 个周期对照实例均逐块复用缓存像素；目视检查覆盖/相位图板。
-这些是入口、依赖与共用实现迁移的回归检查，没有新增防御性测试框架或新审美实验。
+## 本轮代码整理回归
 
-## 工程审阅结论
+整理前对全部 11 组现有源参数保存 12×12、16px/单位的纯源与布局 A/B 像素摘要。
+整理后，包括移走旧源码和 C++ build 之后，这 33 张代表图片的像素摘要完全一致。
+Q4.8 三次方向、Q5.5、Q7、Q8、Q12 的自动探针及完整数值报告一致；30 张高清 PNG 的 SHA-256 未变。
+3 项当前测试与一次实际 CLI 出图通过，高清导出脚本能够加载新模块。
+不重生成整套高清图，不重新挑选参数，也不把工程重构称为算法改进。
 
-本轮由实现者自审，不声称独立评审：
-
-- QRP 源场不再携带已退出的全局 Wang 调制参数或网格依赖；Wang 约束仍在瓦片层。
-- C++ 源谱序列化只有一处；Python 实验不再互相导入阅读探针或依赖临时目录。
-- 移除旧全局/造型/来源混合入口、试调台、报告生成器及仅服务它们的模型和测试；研究记录与原图保留，代码可从 Git 恢复。
-- 相位、覆盖脚本从实际源重新求解；覆盖基线不依赖旧缓存，相位迁移显式读取零相位分配。
-- 默认三组配方、显示、求解器和研究结论不变。方法仍有边界结构代价和场值越界等已记录限制。
+完整范围见[代码整理记录](code-cleanup-2026-10-06.md)。
+[2026-10-05 文件整理](file-cleanup-2026-10-05.md)、[2026-09-25 旧验证](history/validation-2026-09-25.md)均保留为当时事实，不作为现在的构建命令。

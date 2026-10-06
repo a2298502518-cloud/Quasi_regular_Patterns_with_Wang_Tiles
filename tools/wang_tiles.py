@@ -1,18 +1,7 @@
-"""Endpoint-coded Wang catalog and pixel-only assembly; layouts have bottom-up rows."""
+"""单位 Wang tile 的边匹配与像素组装；边顺序为 S、N、W、E。"""
 
 import numpy as np
 from PIL import Image
-
-
-def endpoint_edges(tile_id):
-    sw, se, nw, ne = ((tile_id >> i) & 1 for i in range(4))
-    return (2 * sw + se, 2 * nw + ne, 2 * sw + nw, 2 * se + ne)
-
-
-def make_layout(seed, size=5):
-    vertices = np.random.default_rng(seed).integers(0, 2, size=(size + 1, size + 1))
-    return (vertices[:-1, :-1] + 2 * vertices[:-1, 1:]
-            + 4 * vertices[1:, :-1] + 8 * vertices[1:, 1:])
 
 
 def mismatches(layout, edges):
@@ -29,8 +18,4 @@ def assemble(layout, tiles):
     for y, x in np.ndindex(layout.shape):
         row = size - 1 - y
         result[row*pixels:(row+1)*pixels, x*pixels:(x+1)*pixels] = tiles[layout[y, x]]
-    exact = all(np.array_equal(
-        result[(size-1-y)*pixels:(size-y)*pixels, x*pixels:(x+1)*pixels],
-        tiles[layout[y, x]]) for y, x in np.ndindex(layout.shape))
-    assert exact
-    return Image.fromarray(result), exact
+    return Image.fromarray(result)

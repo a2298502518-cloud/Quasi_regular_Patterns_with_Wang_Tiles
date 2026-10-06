@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "QRP: build native Debug",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/native.ps1", "-Action", "build", "-Configuration", "Debug"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": ["$msCompile"],
+      "group": {"kind": "build", "isDefault": true}
+    },
+    {
+      "label": "QRP: run native workbench",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/native.ps1", "-Action", "run"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "QRP: test native method",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/native.ps1", "-Action", "test"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "QRP: generate Python reference",
+      "type": "process",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/run.ps1"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "QRP: test Python reference",
+      "type": "process",
+      "command": "${workspaceFolder}/.codex-temp/joint-field-venv/Scripts/python.exe",
+      "args": ["-X", "utf8", "${workspaceFolder}/tests/current_pipeline_tests.py", "-v"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    }
+  ]
+}

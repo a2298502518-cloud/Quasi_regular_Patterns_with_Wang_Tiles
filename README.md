@@ -1,84 +1,81 @@
-# Quasi-regular Patterns with Wang Tiles
+# QRP 与 Wang tiles 的准规则纹样生成
 
-研究目标：把 QRP 的形态生成与 Wang 的有限内容复用结合，生成风格多样、可调的纹样。
-QRP 参数属于设计层；Wang 是内部铺砌机制，不向用户暴露参数。现阶段不开发调试台。
+本项目现在只维护**保留局部 QRP 母题的有限 Wang 相容生成**，即已获老师认可方向的 relational 直接公式路线。
+从参数生成相位场、有限角色与合法铺砌，不以图像拟合建库为前置步骤。
 
-## 当前研究与对照
+[论文核心](docs/qrp-bounded-connection-paper-core.md) · [推导与证据](docs/qrp-structured-atlas-study.md) ·
+[文献研究](docs/qrp-ordered-content-research.md) · [原生迁移记录](docs/native-migration-2026-10-06.md)
 
-- **QRP 源场**：`ParametricQrpField` 唯一拥有方向、幅度、相位与解析梯度；不依赖 Wang 网格。
-- **相位兼容对照（C++）**：`PhaseCompatibleQrpTiles` 逐模态闭合，`QrpChannelComposition` 组合通道。
-  可生成固定库并合法重铺，但改变原始频谱、引入周期骨架，不是无损 QRP 裁切。
-- **联合拟合候选（Python）**：共享边界自由度的 Hermite H¹ 拟合；进一步比较同源局部形变、
-  不同源区域覆盖及源块—类型分配。仍有边界结构改变和少量场值越界，尚不是最终论文方法。
-- **Wang 目录与复用**：16 种二值端点编码类型，先生成内容库，再按合法布局直接复制瓦片像素。
-  同边标签约束实际场值及一阶梯度；不使用实例全局位置重算内容，不事后补缝。
+## C++ / OpenGL 本地操作台
 
-三组已认可测试样例保持不变：青金叠瓣（q=5）、靛蓝细描（q=8）、铜金镶边（q=12）。
-相位研究中 q=5 用二阶相位基，q=8/12 用三阶；旧二阶仍保留明确的对照语义，不能混淆为同一种控制。
-`tools/qrp_design_cases.json` 是实际源谱和显示配方的冻结快照，单独修改其中的 q 等元数据不会重建模态。
-
-最新结论见 [内容覆盖与类型分配](docs/qrp-content-coverage-study.md)；
-下一步仍是研究共享接口附近的 QRP 结构代价，不把低误差、低重复或 C¹ 连续直接当成美观或商业价值。
-没有证明严格非周期性、任意参数下的拓扑保持或主观审美优越。
-
-## 构建与运行
-
-Windows / Visual Studio 2022：
+正式入口是 C++20 数学核心与 GLFW / ImGui / OpenGL 3.3 操作台，**运行不调用 Python**。
+本机已有 Visual Studio C++ 工具链与 CMake，项目根目录运行：
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-ctest --test-dir build -C Release --output-on-failure
+./tools/native.ps1 -Action run
 ```
 
-当前 C++ 对照入口只保留一种命令形式，无参数显示帮助：
+编辑 Q、方向函数族、频率、源偏移和保护区后，点击“应用参数 / 生成”。草稿不改变已显示结果。
+可切换同尺度纯 QRP 对照、显示单位 tile 网格、缩放/拖动画布、调整高度阈值及颜色。
+Wang 构造参数不作为风格控制；布局种子和全同状态只放在单独的铺砌对照面板。
+默认预览 24×24 单位、48px/单位，即 1152×1152；默认高清 192px/单位，即 4608×4608。
+预览和高清均从同一 C++ 公式及采样配色求值，高清不是放大预览。
+每次 GUI 导出新建 `output/native-workbench/<时间戳>/`，包含纹样、纯源和参数，不覆盖论文交付。
+
+无需界面也可用 C++ 生成：
 
 ```powershell
-.\build\Release\qrp_wang_qrp_experiment.exe --study phase
-.\build\Release\qrp_wang_qrp_experiment.exe --study organization
-.\build\Release\qrp_wang_qrp_experiment.exe --study retiling
-# 可追加 输出目录 和 每瓦片像素数
-python tools/build_tile_board.py output/qrp-retiling-study
+./tools/native.ps1 -Action build
+./build/Release/qrp_generate.exe --q 5.5 --extent 24 --pixels 64 --output output/my-native-qrp
+# Q1 等源可能不支持自动峰探针，可显式给出合法源区域
+./build/Release/qrp_generate.exe --q 1 --core-radius 6 --output output/q1-native
 ```
 
-默认输出在 `output/qrp-<study>-tile-study`（phase / organization）
-或 `output/qrp-retiling-study`；前两者默认 96px/瓦片，重铺默认 384px/瓦片。
-低分辨率只用于行为回归，不用于评价细节质量。三个旧 CLI 别名已移除。
+新机器需要 CMake≥3.25 和支持 C++20 的 Visual Studio C++ 工具链。首次构建通过 FetchContent 下载锁定的第三方源码；
+本机可使用 `.codex-temp/native-deps/` 缓存，它只含第三方依赖，不依赖删除区或旧算法。
+目前场求值在 C++ CPU 中执行，OpenGL 负责纹理显示及 UI；没有冒称已迁入 GPU Shader。
 
-研究实验：
+## 在 VSCode 使用
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt
-.\.venv\Scripts\python.exe -X utf8 tools/joint_field_probe.py
-.\.venv\Scripts\python.exe -X utf8 tools/phase_response_study.py
-.\.venv\Scripts\python.exe -X utf8 tools/content_coverage_study.py
-.\.venv\Scripts\python.exe -X utf8 tools/content_coverage_study.py --phase-transfer
-```
+通过“终端 → 运行任务”选择 **QRP: run native workbench**。
+F5 选择 **QRP C++ / OpenGL 操作台**；需要 C/C++ 扩展，启动前自动构建 Debug。
+Ctrl+Shift+B 的默认任务为原生 Debug 构建。Python 配置已明确标为数值参考，不是操作台后台。
 
-覆盖实验不再依赖旧图片或系数缓存；相位迁移需先完成零相位覆盖实验，以冻结其类型分配。
-C++ 源谱导出工具 `qrp_export_sources` 随默认构建生成；两个研究脚本支持 `--exporter` 指定其他构建位置。
-所有生成物写入忽略的 `output/`。具体输入、输出、命令与限制见 [研究工具](tools/README.md)。
+## 当前构造的范围
 
-## 代码边界
+同一算法覆盖所声明线性相位源的任意有限 Q≥1，包括非整数；目前维护 basic 与 cubic-directions。
+有限角点状态、共同整数提升和自动连接间距共同定义内容，指定核心原样保留，合法边标签保证标量场 C² 接边。
+完整单位目录为 16WH 个类型，每组参数下有限且不随画幅扩张；W、H 可随参数变化。
 
-| 位置 | 唯一职责 |
+保护局部母题不等于保持整幅 QRP 的原始频谱、全局对称或全部轮廓拓扑。
+合法布局中包括周期对照，不称为强非周期 tile set；连续性和变化量也不能代替美感评价。
+本轮迁移保持当前路线公式不变，没有恢复旧算法或重新挑选样图。
+数学参数域不等于无限工程资源：当前原生数值矩阵预算为 2048 项、图像单边预算为 16384px，并限制尺寸枚举预算。
+这些是明确报错的资源约束，不是逐 Q 配方，也不保证全部参数可以实时调节。
+
+## 已有结果
+
+| 本地目录 | 内容 |
 | --- | --- |
-| `src/model/ParametricQrpField.*` | QRP 谱与解析求值 |
-| `src/model/EndpointWangTiles.hpp` | 类型 ID 与边标签 |
-| `src/model/PhaseCompatibleQrpTiles.*` | 逐模态闭合对照 |
-| `apps/TileStudyRecipes.*` | C++ 对照配方 |
-| `apps/TileStudyExport.*` | 烘焙、布局、像素复用与清单 |
-| `apps/QrpSourceExport.*` | C++ 与 Python 共用的源谱序列化 |
-| `tools/joint_field.py` | 源谱解释、共享边界求解、采样与固定显示 |
-| `tools/wang_tiles.py` | Python 端点目录、合法布局与纯像素拼接 |
-| `tools/*_study.py`、`joint_field_probe.py` | 固定实验的编排与证据输出 |
-| `tests/` | canonical 参考、QRP 核心、相位兼容瓦片三组必要测试 |
+| [高清交付](output/QRP_Wang_HD_2026-09-30/00_使用说明.txt) | 10 个 Q，30 张独立 4608×4608 PNG，参数与校验值保留 |
+| [跨 Q 图库](output/qrp-motif-connection-q-gallery/README.md) | Q5、5.5、6、8、9、10、11、13 的同尺度对照 |
+| `output/qrp-motif-connection-relational/` | Q4.8 三次方向、Q6、Q7；复用、一般 Q 与相对支消融证据 |
+| `output/qrp-motif-connection-new-parameters/` | Q8、Q12 参数结果 |
+| 其他保留的 atlas / motif 输出 | 必要历史机制对照，只留证据，不继续维护其旧生成代码 |
 
-旧全局模型、轮廓造型、来源混合、试调台及报告生成器已移出工作目录，
-完整保存在 Git 提交 `b58337a`，见 [历史恢复说明](docs/legacy-experiments.md)。
-历史图片、研究记录和 Word 报告保留，不将它们当成当前成果。
+这些本地交付与生成物不进入公开 Git 仓库。
 
-[当前验证](docs/validation.md) · [QRP 理解](docs/qrp-foundations-review.md) ·
-[Wang 理解](docs/wang-foundations-review.md) · [联合拟合](docs/qrp-joint-field-study.md) ·
-[相位兼容对照](docs/qrp-phase-compatible-tile-study.md) · [文献地图](docs/literature-map.md)
+## 必要检查和历史资料
+
+```powershell
+./tools/native.ps1 -Action test
+```
+
+检查当前完整目录边迹、保护核心、梯度、解析界及扩幅；详见[验证记录](docs/validation.md)。
+`tools/` 中保留的 Python 数值参考仅用于迁移对照及论文辅助，不是长期并行维护的另一条产品算法。
+其运行方式和对照命令见[工具说明](tools/README.md)。
+旧 C++、旧桌面、相位拟合、图册实验和旧测试仍在 `删除区_2026-10-06/`，不再是运行依赖。
+历史研究文档、Word 报告和本地配方备份仍在[历史资料](docs/history/README.md)。
+未永久删除旧代码；清空删除区后，其中未提交过的材料不能从该备份恢复。
+
+[文档索引](docs/README.md) · [恢复说明](docs/legacy-experiments.md)
